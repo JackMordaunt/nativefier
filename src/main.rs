@@ -1,40 +1,22 @@
-use web_view::*;
-use clap::{Arg, App};
 use std::{
     env,
+    error::Error,
     fs,
     path::PathBuf,
     io::prelude::*,
-    error::Error,
 };
+use web_view::*;
+use clap::{Arg, App};
 use handlebars::Handlebars;
 use serde_json::json;
+use os_type;
 
-static PLIST: &'static str = r#"
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>English</string>
-	<key>CFBundleExecutable</key>
-	<string>{{executable}}</string>
-	<key>CFBundleIdentifier</key>
-	<string>com.nativefier.{{executable}}</string>
-	<key>CFBundleName</key>
-	<string>{{executable}}</string>
-	<key>CFBundleSupportedPlatforms</key>
-	<array>
-		<string>MacOSX</string>
-	</array>
-	<key>NSSupportsSuddenTermination</key>
-	<string>YES</string>
-        <key>NSHighResolutionCapable</key>
-        <string>True</string>
-</dict>
-</plist>
-
-"#;
+fn main() {
+    match Mode::detect().expect("detecting execution mode") {
+        Mode::Generator => generator(),
+        Mode::Generated => generated(),
+    }
+}
 
 enum Mode {
     Generator,
@@ -70,18 +52,19 @@ fn generator() {
     let title = matches.value_of("title").expect("parsing title");
     let url = matches.value_of("url").expect("parsing url");
     // TODO(jfm): bundle for Windows/Linux.
-    bundle_darwin(title, url).expect("bundling site into MacOS .app bundle");
-}
-
-fn bundle_darwin(title: &str, url: &str) -> Result<(), Box<Error>> {
-    let app = PathBuf::from(format!("{0}.app/Contents/MacOS/{0}", title));
-    let plist = PathBuf::from(format!("{0}.app/Contents/Info.plist", title));
-    fs::create_dir_all(app.parent().unwrap())?;
-    fs::copy(env::current_exe()?.to_path_buf(), app)?;
-    let h = Handlebars::new();
-    fs::File::create(plist)?.write(h.render_template(PLIST, &json!({"executable": title}))?.as_bytes())?;
-    // TODO(jfm): Write wrapper bash script to pass url to the binary as a flag.  
-    Ok(())
+    let b = match os_type::current_platform().os_type {
+        os_type::OSType::OSX => {
+            Darwin {
+                dir: "",
+                title: title,
+                url: url,
+            }
+        },
+        _ => {
+            panic!("os not supported");
+        },
+    };
+    b.bundle().expect("bundling app");
 }
 
 fn generated() {
@@ -103,9 +86,54 @@ fn find_config() -> Result<(String, String), Box<Error>> {
     Ok((String::from("SoundCloud"), String::from("https://soundcloud.com/discover")))
 }
 
-fn main() {
-    match Mode::detect().expect("detecting execution mode") {
-        Mode::Generator => generator(),
-        Mode::Generated => generated(),
+/// Bundler is any object that can produce an executable bundle.
+/// This allows us to be polymorphic across operating systems (macos, windows,
+/// linux) and their various ways of handling an app bundle. 
+pub trait Bundler {
+    fn bundle(&self) -> Result<(), Box<Error>>;
+}
+
+// Darwin bundles a macos app bundle. 
+pub struct Darwin<'a> {
+    pub dir: &'a str,
+    pub title: &'a str,
+    pub url: &'a str,
+}
+
+impl<'a> Bundler for Darwin<'a> {
+    fn bundle(&self) -> Result<(), Box<Error>> {
+        let app = PathBuf::from(format!("{0}.app/Contents/MacOS/{0}", self.title));
+        let plist = PathBuf::from(format!("{0}.app/Contents/Info.plist", self.title));
+        fs::create_dir_all(app.parent().unwrap())?;
+        fs::copy(env::current_exe()?.to_path_buf(), app)?;
+        let h = Handlebars::new();
+        fs::File::create(plist)?.write(h.render_template(PLIST, &json!({"executable": self.title}))?.as_bytes())?;
+        // TODO(jfm): Write wrapper bash script to pass url to the binary as a flag.  
+        Ok(())
     }
 }
+
+static PLIST: &'static str = r#"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>English</string>
+	<key>CFBundleExecutable</key>
+	<string>{{executable}}</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.nativefier.{{executable}}</string>
+	<key>CFBundleName</key>
+	<string>{{executable}}</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
+	<key>NSSupportsSuddenTermination</key>
+	<string>YES</string>
+        <key>NSHighResolutionCapable</key>
+        <string>True</string>
+</dict>
+</plist>
+"#;
