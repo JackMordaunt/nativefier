@@ -2,3 +2,5 @@
 **/*.rs.bk
 **.app
 **tmp
+*.ico
+*.icns
