@@ -9,15 +9,57 @@ use web_view::*;
 use clap::{Arg, App};
 use handlebars::Handlebars;
 use serde_json::json;
-use os_type;
 
 fn main() {
     match Mode::detect().expect("detecting execution mode") {
-        Mode::Generator => generator(),
-        Mode::Generated => generated(),
+        Mode::Generator => {
+            let matches = App::new("nativefier")
+                .version("0.0.1")
+                .author("Jack Mordaunt <jackmordaunt@gmail.com>")
+                .about("create native apps for your favourite site")
+                .arg(Arg::with_name("title")
+                    .required(true)
+                    .takes_value(true)
+                    .help("title of site"))
+                .arg(Arg::with_name("url")
+                    .required(true)
+                    .takes_value(true)
+                    .help("url of site to nativefy"))
+                .get_matches();
+            let title = matches.value_of("title").expect("parsing title");
+            let url = matches.value_of("url").expect("parsing url");
+            if cfg!(windows) {
+                Windows {
+                    dir: "",
+                    title: title,
+                    url: url,
+                }.bundle().expect("bundling Windows app");
+            } else {
+                Darwin {
+                    dir: "",
+                    title: title,
+                    url: url,
+                }.bundle().expect("bundling MacOS app");
+            }
+        },
+        Mode::Generated => {
+            let config = Config::load().unwrap();
+            let wv = web_view::builder()
+                .title(&config.title)
+                .content(Content::Url(&config.url))
+                .size(800, 600)
+                .resizable(true)
+                .debug(true)
+                .user_data(())
+                .invoke_handler(|_wv, _arg| { Ok(()) } )
+                .build()
+                .expect("building webview");
+            wv.run().expect("running webview");
+        },
     }
 }
 
+// Mode specifies how to behave. 
 enum Mode {
     Generator,
     Generated,
@@ -25,9 +67,12 @@ enum Mode {
 
 impl Mode {
     fn detect() -> Result<Mode, Box<Error>> {
-        // TODO(jfm): implement for Windows/Linux.
         for c in env::current_exe()?.canonicalize()?.components() {
-            if c.as_os_str().to_string_lossy().contains(".app") {
+            let cmp = c.as_os_str().to_string_lossy();
+            if cmp.contains("nativefier.exe") {
+                return Ok(Mode::Generator);
+            }
+            if cmp.contains(".app") {
                 return Ok(Mode::Generated);
             }
         }
@@ -35,55 +80,27 @@ impl Mode {
     }
 }
 
-fn generator() {
-    let matches = App::new("nativefier")
-        .version("0.0.1")
-        .author("Jack Mordaunt <jackmordaunt@gmail.com>")
-        .about("create native apps for your favourite site")
-        .arg(Arg::with_name("title")
-            .required(true)
-            .takes_value(true)
-            .help("title of site"))
-        .arg(Arg::with_name("url")
-            .required(true)
-            .takes_value(true)
-            .help("url of site to nativefy"))
-        .get_matches();
-    let title = matches.value_of("title").expect("parsing title");
-    let url = matches.value_of("url").expect("parsing url");
-    // TODO(jfm): bundle for Windows/Linux.
-    let b = match os_type::current_platform().os_type {
-        os_type::OSType::OSX => {
-            Darwin {
-                dir: "",
-                title: title,
-                url: url,
-            }
-        },
-        _ => {
-            panic!("os not supported");
-        },
-    };
-    b.bundle().expect("bundling app");
+struct Config {
+    title: String,
+    url: String,
 }
 
-fn generated() {
-    let (title, url) = find_config().unwrap();
-    let wv = web_view::builder()
-        .title(&title)
-        .content(Content::Url(&url))
-        .size(800, 600)
-        .resizable(true)
-        .debug(true)
-        .user_data(())
-        .invoke_handler(|_wv, _arg| { Ok(()) } )
-        .build()
-        .expect("building webview");
-    wv.run().expect("running webview");
-}
-
-fn find_config() -> Result<(String, String), Box<Error>> {
-    Ok((String::from("SoundCloud"), String::from("https://soundcloud.com/discover")))
+impl Config {
+    fn load() -> Result<Config, Box<Error>> {
+        if cfg!(windows) {
+            let created = fs::File::open(env::current_exe()?.to_path_buf())?.metadata()?.created()?;
+            let json_string = env::var(format!("nativefier_{:?}", created))?;
+            let config: serde_json::Value = serde_json::from_str(&json_string)?;
+            return Ok(Config{
+                title: config["title"].to_string(),
+                url: config["url"].to_string(),
+            });
+        }
+        Ok(Config{
+            title: "".to_string(),
+            url: "".to_string(),
+        })
+    }
 }
 
 /// Bundler is any object that can produce an executable bundle.
@@ -107,8 +124,28 @@ impl<'a> Bundler for Darwin<'a> {
         fs::create_dir_all(app.parent().unwrap())?;
         fs::copy(env::current_exe()?.to_path_buf(), app)?;
         let h = Handlebars::new();
-        fs::File::create(plist)?.write(h.render_template(PLIST, &json!({"executable": self.title}))?.as_bytes())?;
+        fs::File::create(plist)?.write(h.render_template(PLIST, &json!({"executable": &self.title}))?.as_bytes())?;
         // TODO(jfm): Write wrapper bash script to pass url to the binary as a flag.  
+        Ok(())
+    }
+}
+
+// Windows bundles a windows executable. 
+pub struct Windows<'a> {
+    pub dir: &'a str,
+    pub title: &'a str,
+    pub url: &'a str,
+}
+
+impl<'a> Bundler for Windows<'a> {
+    /// TODO(jfm): compile icon. 
+    fn bundle(&self) -> Result<(), Box<Error>> {
+        let bin = format!("{}.exe", &self.title);
+        fs::copy(env::current_exe()?.to_path_buf(), &bin)?;
+        env::set_var(
+            format!("nativefier_{:?}", fs::File::open(&bin)?.metadata()?.created()?),
+            json!({"title": &self.title, "url": &self.url}).to_string(),
+        );
         Ok(())
     }
 }
