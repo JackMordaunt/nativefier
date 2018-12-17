@@ -10,6 +10,8 @@ use clap::{Arg, App};
 use handlebars::Handlebars;
 use serde_json::json;
 
+mod infer;
+
 fn main() {
     match Mode::detect().expect("detecting execution mode") {
         Mode::Generator => {
@@ -95,11 +97,15 @@ impl Config {
                 title: config["title"].to_string(),
                 url: config["url"].to_string(),
             });
+        } 
+        if cfg!(unix) {
+            let args: Vec<_> = env::args().collect();
+            return Ok(Config{
+                title: args[1].clone(),
+                url: args[2].clone(),
+            });
         }
-        Ok(Config{
-            title: "".to_string(),
-            url: "".to_string(),
-        })
+        Err("unsupported platform".into())
     }
 }
 
@@ -119,12 +125,28 @@ pub struct Darwin<'a> {
 
 impl<'a> Bundler for Darwin<'a> {
     fn bundle(&self) -> Result<(), Box<Error>> {
-        let app = PathBuf::from(format!("{0}.app/Contents/MacOS/{0}", self.title));
-        let plist = PathBuf::from(format!("{0}.app/Contents/Info.plist", self.title));
-        fs::create_dir_all(app.parent().unwrap())?;
-        fs::copy(env::current_exe()?.to_path_buf(), app)?;
+        let app = PathBuf::from(format!("{0}.app", &self.title));
+        for dir in vec!["Contents/MacOS", "Contents/Resources"] {
+            fs::create_dir_all(app.join(dir))?;
+        }
+        fs::copy(
+            env::current_exe()?.to_path_buf(),
+            app.join(format!("Contents/MacOS/{0}", &self.title)),
+        )?;
         let h = Handlebars::new();
-        fs::File::create(plist)?.write(h.render_template(PLIST, &json!({"executable": &self.title}))?.as_bytes())?;
+        let plist = PathBuf::from(format!("{0}.app/Contents/Info.plist", &self.title));
+        fs::File::create(plist)?.write(h.render_template(PLIST, &json!({"executable": &self.title, "url": &self.url}))?.as_bytes())?;
+        let icon = infer::infer_icon(self.url)?;
+        let icon_path = format!("{0}.app/Contents/Resources/icon.png", &self.title);
+        fs::write(&icon_path, icon)?;
+        use std::process::Command;
+        Command::new("icnsify")
+            .arg("-i")
+            .arg(&icon_path)
+            .arg("-o")
+            .arg(format!("{0}.app/Contents/Resources/icon.icns", &self.title))
+            .output()
+            .expect("converting png to icns");
         // TODO(jfm): Write wrapper bash script to pass url to the binary as a flag.  
         Ok(())
     }
@@ -159,6 +181,14 @@ static PLIST: &'static str = r#"
 	<string>English</string>
 	<key>CFBundleExecutable</key>
 	<string>{{executable}}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{executable}}</string>
+        <string>{{executable}}</string>
+        <string>"{{url}}"</string>
+    </array>
+    <key>CFBundleIconFile</key>
+    <string>icon.icns</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.nativefier.{{executable}}</string>
 	<key>CFBundleName</key>
@@ -169,8 +199,8 @@ static PLIST: &'static str = r#"
 	</array>
 	<key>NSSupportsSuddenTermination</key>
 	<string>YES</string>
-        <key>NSHighResolutionCapable</key>
-        <string>True</string>
+    <key>NSHighResolutionCapable</key>
+    <string>True</string>
 </dict>
 </plist>
 "#;
