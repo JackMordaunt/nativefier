@@ -10,7 +10,6 @@ web-view = { git = "https://github.com/Boscop/web-view.git" }
 clap = "2.32.0"
 serde_json = "1.0.33"
 handlebars = { git = "https://github.com/sunng87/handlebars-rust.git" }
-os_type = "2.2"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"
