@@ -1,9 +1,10 @@
 use std::{
     env,
-    error::Error,
     fs,
+    error::Error,
     path::PathBuf,
     io::prelude::*,
+    process::Command,
 };
 use web_view::*;
 use clap::{Arg, App};
@@ -157,15 +158,12 @@ impl<'a> Bundler for Darwin<'a> {
         let icon = infer::infer_icon(self.url)?;
         let icon_path = format!("{0}.app/Contents/Resources/icon.png", &self.title);
         fs::write(&icon_path, icon)?;
-        use std::process::Command;
         Command::new("icnsify")
             .arg("-i")
             .arg(&icon_path)
             .arg("-o")
             .arg(format!("{0}.app/Contents/Resources/icon.icns", &self.title))
-            .output()
-            .expect("converting png to icns");
-        // TODO(jfm): Write wrapper bash script to pass url to the binary as a flag.  
+            .output()?;
         Ok(())
     }
 }
