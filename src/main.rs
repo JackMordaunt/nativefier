@@ -137,8 +137,23 @@ impl<'a> Bundler for Darwin<'a> {
             app.join(format!("Contents/MacOS/{0}", &self.title)),
         )?;
         let h = Handlebars::new();
-        let plist = PathBuf::from(format!("{0}.app/Contents/Info.plist", &self.title));
-        fs::File::create(plist)?.write(h.render_template(PLIST, &json!({"executable": &self.title, "url": &self.url}))?.as_bytes())?;
+        let plist = format!("{0}.app/Contents/Info.plist", &self.title);
+        fs::File::create(&plist)?
+            .write(h.render_template(PLIST.trim(), &json!({
+                "executable": &self.title,
+                "url": &self.url,
+            }))?.as_bytes())?;
+        let wrapper = format!("{0}.app/Contents/MacOS/{0}.sh", &self.title);
+        fs::File::create(&wrapper)?
+            .write(h.render_template(WRAPPER.trim(), &json!({
+                "executable": &self.title,
+                "title": &self.title,
+                "url": &self.url,
+            }))?.as_bytes())?;
+        Command::new("chmod")
+            .arg("+x")
+            .arg(&wrapper)
+            .output()?;
         let icon = infer::infer_icon(self.url)?;
         let icon_path = format!("{0}.app/Contents/Resources/icon.png", &self.title);
         fs::write(&icon_path, icon)?;
@@ -206,4 +221,10 @@ static PLIST: &'static str = r#"
     <string>True</string>
 </dict>
 </plist>
+"#;
+
+static WRAPPER: &'static str = r#"
+#!/usr/bin/env bash
+DIR=$(cd "$(dirname "$0")"; pwd)
+$DIR/{{executable}} {{title}} "{{url}}" 
 "#;
