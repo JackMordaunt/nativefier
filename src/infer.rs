@@ -42,11 +42,12 @@ impl<D: Downloader> Inferer<D> {
         let mut buf = String::new();
         body.read_to_string(&mut buf)?;
         let doc = Html::parse_document(&buf);
+        // Look for apple-touch-icon.
         let apple_touch = Selector::parse("link[rel=\"apple-touch-icon\"]").unwrap();
         for link in doc.select(&apple_touch) {
             return Ok(Icon::download(&self.client, &link)?);
         }
-        // Look for high res icon.
+        // Look for high res icon with "sizes" attribute.
         let icon_link = Selector::parse("link[rel=\"icon\"]").unwrap();
         let mut links: Vec<ElementRef> = doc.select(&icon_link).collect();
         links.sort_by(|left, right| {
