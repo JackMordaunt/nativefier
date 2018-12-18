@@ -100,6 +100,9 @@ impl Config {
         } 
         if cfg!(unix) {
             let args: Vec<_> = env::args().collect();
+            if args.len() < 2 {
+                return Err("not enough arguments".into());
+            }
             return Ok(Config{
                 title: args[1].clone(),
                 url: args[2].clone(),
