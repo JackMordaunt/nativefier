@@ -195,30 +195,27 @@ static PLIST: &'static str = r#"
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>English</string>
 	<key>CFBundleExecutable</key>
-	<string>{{executable}}</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>{{executable}}</string>
-        <string>{{executable}}</string>
-        <string>"{{url}}"</string>
-    </array>
-    <key>CFBundleIconFile</key>
-    <string>icon.icns</string>
+		<string>{{executable}}.sh</string>
+	<key>CFBundleIconFile</key>
+		<string>icon.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.nativefier.{{executable}}</string>
-	<key>CFBundleName</key>
-	<string>{{executable}}</string>
-	<key>CFBundleSupportedPlatforms</key>
-	<array>
-		<string>MacOSX</string>
-	</array>
-	<key>NSSupportsSuddenTermination</key>
-	<string>YES</string>
-    <key>NSHighResolutionCapable</key>
-    <string>True</string>
+		<string>com.nativefier.{{executable}}</string>
+	<key>NSHighResolutionCapable</key>
+		<true/>
+	<key>NSAppTransportSecurity</key>
+		<dict>
+			<key>NSExceptionDomains</key>
+				<dict>
+					<key>localhost</key>
+						<dict>
+							<key>NSExceptionAllowsInsecureHTTPLoads</key>
+								<true/>
+							<key>NSIncludesSubdomains</key>
+								<true/>
+						</dict>
+				</dict>
+		</dict>
 </dict>
 </plist>
 "#;
