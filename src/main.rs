@@ -96,7 +96,7 @@ pub struct Darwin<'a> {
     pub url: &'a str,
 }
 
-impl<'a> Bundler for Darwin<'a> {
+impl Bundler for Darwin<'_> {
     fn bundle(&self) -> Result<(), Box<Error>> {
         let app = PathBuf::from(&self.dir).join(format!("{0}.app", &self.title));
         for dir in ["Contents/MacOS", "Contents/Resources"].iter() {
@@ -149,7 +149,7 @@ pub struct Windows<'a> {
 /// In order to capture post-compilation information (ie, our arguments:
 /// title and url) we embed it into a batch script that is then self extracted
 /// and run.  
-impl<'a> Bundler for Windows<'a> {
+impl Bundler for Windows<'_> {
     /// TODO(jfm): compile icon. 
     fn bundle(&self) -> Result<(), Box<Error>> {
         fs::create_dir_all(&self.dir)?;
