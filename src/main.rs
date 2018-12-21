@@ -14,42 +14,56 @@ use serde_json::json;
 mod infer;
 
 fn main() {
-    match Mode::detect().expect("detecting execution mode") {
+    let matches = App::new("nativefier")
+        .version("0.0.1")
+        .author("Jack Mordaunt <jackmordaunt@gmail.com>")
+        .about("create native apps for your favourite site")
+        .arg(Arg::with_name("title")
+            .required(true)
+            .takes_value(true)
+            .help("title of site"))
+        .arg(Arg::with_name("url")
+            .required(true)
+            .takes_value(true)
+            .help("url of site to nativefy"))
+        .arg(Arg::with_name("generate")
+            .short("g")
+            .long("generate")
+            .help("generate the native app"))
+        .arg(Arg::with_name("dir")
+            .short("d")
+            .long("dir")
+            .takes_value(true)
+            .conflicts_with("run")
+            .help("output directory for generated app, defaults to current directory"))
+        .get_matches();
+    let title = matches.value_of("title").expect("parsing title");
+    let url = matches.value_of("url").expect("parsing url");
+    let dir = matches.value_of("dir").unwrap_or("");
+    let mode = match matches.value_of("generate") {
+        Some(_) => Mode::Generator,
+        None => Mode::Generated,
+    };
+    match mode {
         Mode::Generator => {
-            let matches = App::new("nativefier")
-                .version("0.0.1")
-                .author("Jack Mordaunt <jackmordaunt@gmail.com>")
-                .about("create native apps for your favourite site")
-                .arg(Arg::with_name("title")
-                    .required(true)
-                    .takes_value(true)
-                    .help("title of site"))
-                .arg(Arg::with_name("url")
-                    .required(true)
-                    .takes_value(true)
-                    .help("url of site to nativefy"))
-                .get_matches();
-            let title = matches.value_of("title").expect("parsing title");
-            let url = matches.value_of("url").expect("parsing url");
             if cfg!(windows) {
                 Windows {
-                    dir: "",
-                    title: title,
-                    url: url,
+                    dir: &dir,
+                    title: &title,
+                    url: &url,
                 }.bundle().expect("bundling Windows app");
             } else {
                 Darwin {
-                    dir: "",
-                    title: title,
-                    url: url,
+                    dir: &dir,
+                    title: &title,
+                    url: &url,
                 }.bundle().expect("bundling MacOS app");
             }
         },
         Mode::Generated => {
-            let config = Config::load().unwrap();
             let wv = web_view::builder()
-                .title(&config.title)
-                .content(Content::Url(&config.url))
+                .title(&title)
+                .content(Content::Url(&url))
                 .size(800, 600)
                 .resizable(true)
                 .debug(true)
@@ -68,51 +82,6 @@ enum Mode {
     Generated,
 }
 
-impl Mode {
-    fn detect() -> Result<Mode, Box<Error>> {
-        for c in env::current_exe()?.canonicalize()?.components() {
-            let cmp = c.as_os_str().to_string_lossy();
-            if cmp.contains("nativefier.exe") {
-                return Ok(Mode::Generator);
-            }
-            if cmp.contains(".app") {
-                return Ok(Mode::Generated);
-            }
-        }
-        return Ok(Mode::Generator);
-    }
-}
-
-struct Config {
-    title: String,
-    url: String,
-}
-
-impl Config {
-    fn load() -> Result<Config, Box<Error>> {
-        if cfg!(windows) {
-            let created = fs::File::open(env::current_exe()?.to_path_buf())?.metadata()?.created()?;
-            let json_string = env::var(format!("nativefier_{:?}", created))?;
-            let config: serde_json::Value = serde_json::from_str(&json_string)?;
-            return Ok(Config{
-                title: config["title"].to_string(),
-                url: config["url"].to_string(),
-            });
-        } 
-        if cfg!(unix) {
-            let args: Vec<_> = env::args().collect();
-            if args.len() < 2 {
-                return Err("not enough arguments".into());
-            }
-            return Ok(Config{
-                title: args[1].clone(),
-                url: args[2].clone(),
-            });
-        }
-        Err("unsupported platform".into())
-    }
-}
-
 /// Bundler is any object that can produce an executable bundle.
 /// This allows us to be polymorphic across operating systems (macos, windows,
 /// linux) and their various ways of handling an app bundle. 
@@ -129,8 +98,8 @@ pub struct Darwin<'a> {
 
 impl<'a> Bundler for Darwin<'a> {
     fn bundle(&self) -> Result<(), Box<Error>> {
-        let app = PathBuf::from(format!("{0}.app", &self.title));
-        for dir in vec!["Contents/MacOS", "Contents/Resources"] {
+        let app = PathBuf::from(&self.dir).join(format!("{0}.app", &self.title));
+        for dir in ["Contents/MacOS", "Contents/Resources"].iter() {
             fs::create_dir_all(app.join(dir))?;
         }
         fs::copy(
@@ -138,15 +107,15 @@ impl<'a> Bundler for Darwin<'a> {
             app.join(format!("Contents/MacOS/{0}", &self.title)),
         )?;
         let h = Handlebars::new();
-        let plist = format!("{0}.app/Contents/Info.plist", &self.title);
+        let plist = app.join("Contents/Info.plist");
         fs::File::create(&plist)?
             .write(h.render_template(PLIST.trim(), &json!({
                 "executable": &self.title,
                 "url": &self.url,
             }))?.as_bytes())?;
-        let wrapper = format!("{0}.app/Contents/MacOS/{0}.sh", &self.title);
+        let wrapper = app.join(format!("Contents/MacOS/{0}.sh", &self.title));
         fs::File::create(&wrapper)?
-            .write(h.render_template(WRAPPER.trim(), &json!({
+            .write(h.render_template(BASH_WRAPPER.trim(), &json!({
                 "executable": &self.title,
                 "title": &self.title,
                 "url": &self.url,
@@ -156,13 +125,13 @@ impl<'a> Bundler for Darwin<'a> {
             .arg(&wrapper)
             .output()?;
         let icon = infer::infer_icon(self.url)?;
-        let icon_path = format!("{0}.app/Contents/Resources/icon.png", &self.title);
+        let icon_path = app.join("Contents/Resources/icon.png");
         fs::write(&icon_path, icon)?;
         Command::new("icnsify")
             .arg("-i")
             .arg(&icon_path)
             .arg("-o")
-            .arg(format!("{0}.app/Contents/Resources/icon.icns", &self.title))
+            .arg(app.join("Contents/Resources/icon.icns"))
             .output()?;
         Ok(())
     }
@@ -175,20 +144,45 @@ pub struct Windows<'a> {
     pub url: &'a str,
 }
 
+/// Bundle nativefier executable using "iexpress", which is a Windows 
+/// program that creates self extracting installers.
+/// In order to capture post-compilation information (ie, our arguments:
+/// title and url) we embed it into a batch script that is then self extracted
+/// and run.  
 impl<'a> Bundler for Windows<'a> {
     /// TODO(jfm): compile icon. 
     fn bundle(&self) -> Result<(), Box<Error>> {
-        let bin = format!("{}.exe", &self.title);
+        fs::create_dir_all(&self.dir)?;
+        let h = Handlebars::new();
+        let bin = PathBuf::from(&self.dir).join(format!("{0}.exe", &self.title));
+        let batch_file = PathBuf::from(&self.dir).join(format!("{0}.bat", self.title));
+        let sed_file = PathBuf::from(&self.dir).join("tmp.sed");
         fs::copy(env::current_exe()?.to_path_buf(), &bin)?;
-        env::set_var(
-            format!("nativefier_{:?}", fs::File::open(&bin)?.metadata()?.created()?),
-            json!({"title": &self.title, "url": &self.url}).to_string(),
-        );
+        fs::File::create(&batch_file)?
+            .write_all(h.render_template(BATCH_WRAPPER.trim(), &json!({
+                "executable": &bin,
+                "title": &self.title,
+                "url": &self.url,
+            }))?.as_bytes())?;
+        fs::File::create(&sed_file)?
+            .write_all(h.render_template(SED_FILE.trim(), &json!({
+                "name": &self.title,
+                "executable": &format!("{0}.exe", &self.title),
+                "entry_point": &batch_file,
+                "source_directory": &self.dir,
+                "target": PathBuf::from(&self.dir).join(format!("target_{0}.exe", &self.title)),
+            }))?.as_bytes())?;
+        Command::new("iexpress.exe")
+            .arg("/N")
+            .arg("/Q")
+            .arg(&sed_file)
+            .output()?;
         Ok(())
     }
 }
 
-static PLIST: &'static str = r#"
+/// .plist files are config files which MacOS .app bundles use. 
+const PLIST: &str = r#"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -218,8 +212,58 @@ static PLIST: &'static str = r#"
 </plist>
 "#;
 
-static WRAPPER: &'static str = r#"
+/// Bash script that invokes the generated executable with the given arguments.
+const BASH_WRAPPER: &str = r#"
 #!/usr/bin/env bash
 DIR=$(cd "$(dirname "$0")"; pwd)
-$DIR/{{executable}} {{title}} "{{url}}" 
+$DIR/{{executable}} {{title}} "{{url}}"
+"#;
+
+/// .sed files are config files for "iexpress", which creates self extracting 
+/// installers.
+const SED_FILE: &str = r#"
+[Version]
+Class=IEXPRESS
+SEDVersion=3
+[Options]
+PackagePurpose=InstallApp
+ShowInstallProgramWindow=1
+HideExtractAnimation=1
+UseLongFileName=0
+InsideCompressed=0
+CAB_FixedSize=0
+CAB_ResvCodeSigning=0
+RebootMode=N
+InstallPrompt=%InstallPrompt%
+DisplayLicense=%DisplayLicense%
+FinishMessage=%FinishMessage%
+TargetName=%TargetName%
+FriendlyName=%FriendlyName%
+AppLaunched=%AppLaunched%
+PostInstallCmd=%PostInstallCmd%
+AdminQuietInstCmd=%AdminQuietInstCmd%
+UserQuietInstCmd=%UserQuietInstCmd%
+SourceFiles=SourceFiles
+[Strings]
+InstallPrompt=
+DisplayLicense=
+FinishMessage=
+TargetName={{target}}
+FriendlyName={{name}}
+AppLaunched={{entry_point}}
+PostInstallCmd=<None>
+AdminQuietInstCmd=
+UserQuietInstCmd=
+FILE0="{{entry_point}}"
+FILE1="{{executable}}"
+[SourceFiles]
+SourceFiles0={{parent_directory}}
+[SourceFiles0]
+%FILE0%=
+%FILE1%=
+"#;
+
+/// Batch script that invokes the generated executable with the given arguments. 
+const BATCH_WRAPPER: &str = r#"
+cmd.exe /c start {{executable}} {{title}} "{{url}}"
 "#;
