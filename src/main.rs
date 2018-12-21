@@ -109,13 +109,13 @@ impl Bundler for Darwin<'_> {
         let h = Handlebars::new();
         let plist = app.join("Contents/Info.plist");
         fs::File::create(&plist)?
-            .write(h.render_template(PLIST.trim(), &json!({
+            .write_all(h.render_template(PLIST.trim(), &json!({
                 "executable": &self.title,
                 "url": &self.url,
             }))?.as_bytes())?;
         let wrapper = app.join(format!("Contents/MacOS/{0}.sh", &self.title));
         fs::File::create(&wrapper)?
-            .write(h.render_template(BASH_WRAPPER.trim(), &json!({
+            .write_all(h.render_template(BASH_WRAPPER.trim(), &json!({
                 "executable": &self.title,
                 "title": &self.title,
                 "url": &self.url,
