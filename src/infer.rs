@@ -44,7 +44,7 @@ impl<D: Downloader> Inferer<D> {
         let doc = Html::parse_document(&buf);
         // Look for apple-touch-icon.
         let apple_touch = Selector::parse("link[rel=\"apple-touch-icon\"]").unwrap();
-        for link in doc.select(&apple_touch) {
+        if let Some(link) = doc.select(&apple_touch).nth(0) {
             return Ok(Icon::download(&self.client, &link)?);
         }
         // Look for high res icon with "sizes" attribute.
@@ -52,19 +52,19 @@ impl<D: Downloader> Inferer<D> {
         let mut links: Vec<ElementRef> = doc.select(&icon_link).collect();
         links.sort_by(|left, right| {
             let l_size: Size = match left.value().attr("sizes") {
-                Some(left_sizes) => left_sizes.parse().unwrap_or(Size::empty()),
+                Some(left_sizes) => left_sizes.parse().unwrap_or_else(|_| Size::empty()),
                 None => Size::empty(),
             };
             let r_size: Size = match right.value().attr("sizes") {
-                Some(right_sizes) => right_sizes.parse().unwrap_or(Size::empty()),
+                Some(right_sizes) => right_sizes.parse().unwrap_or_else(|_| Size::empty()),
                 None => Size::empty(),
             };
             l_size.cmp(&r_size)
         });
-        for link in links {
-            return Ok(Icon::download(&self.client, &link)?);
+        match links.first() {
+            Some(l) => Ok(Icon::download(&self.client, l)?),
+            None => Err(format!("no icon found for {}", url).into()),
         }
-        Err(format!("no icon found for {}", url).into())
     }
 }
 
@@ -105,8 +105,8 @@ impl Icon {
         copy(&mut response, &mut icon_data)?;
         Ok(Icon{
             source: href.into(),
-            name: Url::parse(href)?.host_str().unwrap_or("".into()).into(),
-            ext: format!(".{0}", href.split(".").last().unwrap()).into(),
+            name: Url::parse(href)?.host_str().unwrap_or_else(|| "").into(),
+            ext: format!(".{0}", href.split('.').last().unwrap()),
             size: icon_data.len(),
             mime: mime.into(),
             buffer: icon_data,
@@ -139,7 +139,7 @@ impl Size {
 impl std::str::FromStr for Size {
     type Err = Box<Error>;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let parts: Vec<&str> = s.split("x").collect();
+        let parts: Vec<&str> = s.split('x').collect();
         if parts.len() < 2 {
             return Err(format!("invalid dimensions: {}", s).into());
         }
