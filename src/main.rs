@@ -1,18 +1,10 @@
 use web_view::*;
-use clap::{Arg, App};
+use clap::{Arg, App, SubCommand};
 
 mod bundle;
 mod infer;
 
-use crate::bundle::{
-    Bundler,
-};
-
-// Mode specifies how to behave. 
-enum Mode {
-    Generator,
-    Generated,
-}
+use crate::bundle::Bundler;
 
 fn main() {
     let matches = App::new("nativefier")
@@ -27,26 +19,22 @@ fn main() {
             .required(true)
             .takes_value(true)
             .help("url of site to nativefy"))
-        .arg(Arg::with_name("generate")
-            .short("g")
-            .long("generate")
-            .help("generate the native app"))
-        .arg(Arg::with_name("dir")
-            .short("d")
-            .long("dir")
-            .takes_value(true)
-            .conflicts_with("run")
-            .help("output directory for generated app, defaults to current directory"))
+        .subcommand(SubCommand::with_name("generate")
+            .about("generates a standalone binary")
+            .arg(Arg::with_name("dir")
+                .short("d")
+                .long("dir")
+                .takes_value(true)
+                .help("output directory for generated app, defaults to current directory")))
         .get_matches();
     let title = matches.value_of("title").expect("parsing title");
     let url = matches.value_of("url").expect("parsing url");
-    let dir = matches.value_of("dir").unwrap_or("");
-    let mode = match matches.value_of("generate") {
-        Some(_) => Mode::Generator,
-        None => Mode::Generated,
-    };
-    match mode {
-        Mode::Generator => {
+    match matches.subcommand() {
+        ("generate", args) => {
+            let dir = match args {
+                Some(args) => args.value_of("dir").unwrap_or(""),
+                None => "",
+            };
             if cfg!(windows) {
                 bundle::Windows {
                     dir: &dir,
@@ -61,7 +49,7 @@ fn main() {
                 }.bundle().expect("bundling MacOS app");
             }
         },
-        Mode::Generated => {
+        _ => {
             let wv = web_view::builder()
                 .title(&title)
                 .content(Content::Url(&url))
@@ -73,6 +61,6 @@ fn main() {
                 .build()
                 .expect("building webview");
             wv.run().expect("running webview");
-        },
-    }
+        }
+    };
 }
