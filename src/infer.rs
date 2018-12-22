@@ -36,34 +36,42 @@ impl Inferer<reqwest::Client> {
     }
 }
 
+// TODO(jfm) "better icon detection":
+// 1. [x] Search for any link that contains "icon" in it's "rel" attribute.
+// 2. [x] Download all and compare sizes. 
+// 3. [ ] Compare dimensions instead of buffer size.
+// 4. [ ] Download icons concurrently. 
 impl<D: Downloader> Inferer<D> {
     fn infer(&self, url: &str) -> Result<Icon> {
         let mut body = self.client.get(url)?;
         let mut buf = String::new();
         body.read_to_string(&mut buf)?;
         let doc = Html::parse_document(&buf);
-        // Look for apple-touch-icon.
-        let apple_touch = Selector::parse("link[rel=\"apple-touch-icon\"]").unwrap();
-        if let Some(link) = doc.select(&apple_touch).nth(0) {
-            return Ok(Icon::download(&self.client, &link)?);
-        }
-        // Look for high res icon with "sizes" attribute.
-        let icon_link = Selector::parse("link[rel=\"icon\"]").unwrap();
-        let mut links: Vec<ElementRef> = doc.select(&icon_link).collect();
-        links.sort_by(|left, right| {
-            let l_size: Size = match left.value().attr("sizes") {
-                Some(left_sizes) => left_sizes.parse().unwrap_or_else(|_| Size::empty()),
-                None => Size::empty(),
-            };
-            let r_size: Size = match right.value().attr("sizes") {
-                Some(right_sizes) => right_sizes.parse().unwrap_or_else(|_| Size::empty()),
-                None => Size::empty(),
-            };
-            l_size.cmp(&r_size)
-        });
-        match links.first() {
-            Some(l) => Ok(Icon::download(&self.client, l)?),
-            None => Err(format!("no icon found for {}", url).into()),
+        let link_el = Selector::parse("link").unwrap();
+        let mut icons: Vec<Icon> = doc.select(&link_el)
+            .map(|el: ElementRef| {
+                let el = el.value();
+                let rel = match el.attr("rel") {
+                    Some(rel) => rel,
+                    None => return Err("no rel attribute on link element".into()),
+                };
+                let href = match el.attr("href") {
+                    Some(href) => href,
+                    None => return Err("no href attribute on link element".into()),
+                };
+                if !rel.contains("icon") {
+                    return Err("link[rel] does not include 'icon'".into());
+                }
+                Icon::download(&self.client, &href)
+            })
+            .filter_map(|icon| {
+                icon.ok()
+            })
+            .collect();
+        icons.sort();
+        match icons.into_iter().nth(0) {
+            Some(icon) => Ok(icon),
+            None => Err("no icons found".into()),
         }
     }
 }
@@ -80,7 +88,8 @@ impl Downloader for reqwest::Client {
     }
 }
 
-/// Icon is the highest resolution icon detected for a website. 
+/// Icon is icon detected for a website. 
+#[derive(Eq)]
 pub struct Icon {
     pub source: String,
     pub name: String,
@@ -91,15 +100,8 @@ pub struct Icon {
 }
 
 impl Icon {
-    fn download(client: &impl Downloader, link: &ElementRef) -> Result<Icon> {
-        let href = match link.value().attr("href") {
-            Some(href) => href,
-            None => return Err("no href attribute on link element".into()),
-        };
-        let mime = match link.value().attr("type") {
-            Some(mime) => mime,
-            None => "image/png",
-        };
+    fn download(client: &impl Downloader, href: &str) -> Result<Icon> {
+        let mime = "image/png";
         let mut response = client.get(href)?;
         let mut icon_data: Vec<u8> = vec![];
         copy(&mut response, &mut icon_data)?;
@@ -114,6 +116,26 @@ impl Icon {
     }
 }
 
+use std::cmp::{Ordering, Ord, PartialOrd, PartialEq};
+
+impl PartialOrd for Icon {
+    fn partial_cmp(&self, other: &Icon) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Icon {
+    fn cmp(&self, other: &Icon) -> Ordering {
+        self.size.cmp(&other.size)
+    }
+}
+
+impl PartialEq for Icon {
+    fn eq(&self, other: &Icon) -> bool {
+        self.name == other.name && self.size == other.size 
+    }
+}
+
 impl std::convert::AsRef<[u8]> for Icon {
     fn as_ref(&self) -> &[u8] {
         &self.buffer
@@ -124,15 +146,6 @@ impl std::convert::AsRef<[u8]> for Icon {
 struct Size {
     w: u32,
     h: u32,
-}
-
-impl Size {
-    fn empty() -> Size {
-        Size{
-            w: 0,
-            h: 0,
-        }
-    }
 }
 
 /// parse dimensions like "64x64".
