@@ -8,6 +8,12 @@ use crate::bundle::{
     Bundler,
 };
 
+// Mode specifies how to behave. 
+enum Mode {
+    Generator,
+    Generated,
+}
+
 fn main() {
     let matches = App::new("nativefier")
         .version("0.0.1")
@@ -69,10 +75,4 @@ fn main() {
             wv.run().expect("running webview");
         },
     }
-}
-
-// Mode specifies how to behave. 
-enum Mode {
-    Generator,
-    Generated,
 }
