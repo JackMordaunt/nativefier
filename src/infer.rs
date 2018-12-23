@@ -13,6 +13,8 @@ use scraper::{
 };
 use reqwest;
 use url::Url;
+use mime_sniffer::MimeTypeSniffer;
+use image::{self, GenericImageView};
 
 pub type Result<T> = std::result::Result<T, Box<Error>>;
 
@@ -69,7 +71,7 @@ impl<D: Downloader> Inferer<D> {
             })
             .collect();
         icons.sort();
-        match icons.into_iter().nth(0) {
+        match icons.into_iter().last() {
             Some(icon) => Ok(icon),
             None => Err("no icons found".into()),
         }
@@ -89,7 +91,7 @@ impl Downloader for reqwest::Client {
 }
 
 /// Icon is icon detected for a website. 
-#[derive(Eq)]
+#[derive(Eq, Debug)]
 pub struct Icon {
     pub source: String,
     pub name: String,
@@ -97,20 +99,22 @@ pub struct Icon {
     pub ext: String,
     pub mime: String,
     pub buffer: Vec<u8>, 
+    pub dimensions: Size,
 }
 
 impl Icon {
     fn download(client: &impl Downloader, href: &str) -> Result<Icon> {
-        let mime = "image/png";
         let mut response = client.get(href)?;
         let mut icon_data: Vec<u8> = vec![];
         copy(&mut response, &mut icon_data)?;
         Ok(Icon{
             source: href.into(),
             name: Url::parse(href)?.host_str().unwrap_or_else(|| "").into(),
+            // Assumes the url ends with a valid file extension.
             ext: format!(".{0}", href.split('.').last().unwrap()),
+            mime: MimeTypeSniffer::sniff_mime_type(&icon_data).unwrap().into(),
             size: icon_data.len(),
-            mime: mime.into(),
+            dimensions: image::load_from_memory(&icon_data)?.dimensions().into(),
             buffer: icon_data,
         })
     }
@@ -126,13 +130,13 @@ impl PartialOrd for Icon {
 
 impl Ord for Icon {
     fn cmp(&self, other: &Icon) -> Ordering {
-        self.size.cmp(&other.size)
+        self.dimensions.cmp(&other.dimensions)
     }
 }
 
 impl PartialEq for Icon {
     fn eq(&self, other: &Icon) -> bool {
-        self.name == other.name && self.size == other.size 
+        self.name == other.name && self.dimensions == other.dimensions 
     }
 }
 
@@ -143,9 +147,9 @@ impl std::convert::AsRef<[u8]> for Icon {
 }
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
-struct Size {
-    w: u32,
-    h: u32,
+pub struct Size {
+    pub w: u32,
+    pub h: u32,
 }
 
 /// parse dimensions like "64x64".
@@ -160,5 +164,11 @@ impl std::str::FromStr for Size {
             w: parts[0].parse()?,
             h: parts[1].parse()?,
         })
+    }
+}
+
+impl From<(u32, u32)> for Size {
+    fn from(d: (u32, u32)) -> Self {
+        Size{w: d.0, h: d.1}
     }
 }
