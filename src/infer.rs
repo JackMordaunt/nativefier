@@ -1,9 +1,8 @@
-use std::{
-    convert::*,
-    thread,
-    sync::mpsc::channel,
-    io::{copy, Read},
-};
+use std::convert::*;
+use std::thread;
+use std::sync::mpsc::channel;
+use std::io::{copy, Read};
+use std::cmp::{Ordering, Ord, PartialOrd, PartialEq};
 use scraper::{Html, Selector};
 use image::{self, GenericImageView};
 use mime_sniffer::MimeTypeSniffer;
@@ -131,8 +130,6 @@ impl Icon {
         })
     }
 }
-
-use std::cmp::{Ordering, Ord, PartialOrd, PartialEq};
 
 impl PartialOrd for Icon {
     fn partial_cmp(&self, other: &Icon) -> Option<Ordering> {
