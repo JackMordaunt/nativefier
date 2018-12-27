@@ -1,22 +1,16 @@
 use std::{
     convert::*,
-    error::Error,
-    io::{
-        copy,
-        Read,
-    },
+    thread,
+    sync::mpsc::channel,
+    io::{copy, Read},
 };
-use scraper::{
-    Html,
-    Selector,
-    ElementRef,
-};
+use scraper::{Html, Selector};
+use image::{self, GenericImageView};
+use mime_sniffer::MimeTypeSniffer;
 use reqwest;
 use url::Url;
-use mime_sniffer::MimeTypeSniffer;
-use image::{self, GenericImageView};
 
-pub type Result<T> = std::result::Result<T, Box<Error>>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// infer an icon using the default Inferer.
 pub fn infer_icon(url: &str) -> Result<Icon> {
@@ -38,43 +32,61 @@ impl Inferer<reqwest::Client> {
     }
 }
 
-// TODO(jfm) "better icon detection":
-// 1. [x] Search for any link that contains "icon" in it's "rel" attribute.
-// 2. [x] Download all and compare sizes. 
-// 3. [ ] Compare dimensions instead of buffer size.
-// 4. [ ] Download icons concurrently. 
-impl<D: Downloader> Inferer<D> {
+/// infer the best icon for a url by downloading icon links and comparing for
+/// size, preferring the largest. 
+impl<D: Downloader + Clone + Send + 'static> Inferer<D> {
     fn infer(&self, url: &str) -> Result<Icon> {
+        let (tx, tr) = channel();
+        let mut workers = vec![];
+        for link in self.scrape(url)? {
+            let client = self.client.clone();
+            let tx = tx.clone();
+            workers.push(thread::spawn(move || {
+                let icon = Icon::download(&client, &link);
+                tx.send(icon).expect("sending icon result over channel");
+            }));
+        }
+        let mut icons = vec![];
+        for _ in workers {
+            icons.push(tr.recv().expect("receiving icon from channel")?);
+        }
+        icons.sort();
+        match icons.into_iter().last() {
+            Some(icon) => Ok(icon),
+            None => Err(Error::Markup("no icons found".into())),
+        }
+    }
+    /// Scrape icon links form the html markup at the given url.
+    // FIXME: - Should we return stronger types, like Vec<Url>? 
+    //        - Should the scraping errors simply be ignored? They would only 
+    //          be useful for debugging, not for users, so how to expose for 
+    //          debugging?
+    fn scrape(&self, url: &str) -> Result<Vec<String>> {
         let mut body = self.client.get(url)?;
         let mut buf = String::new();
         body.read_to_string(&mut buf)?;
         let doc = Html::parse_document(&buf);
         let link_el = Selector::parse("link").unwrap();
-        let mut icons: Vec<Icon> = doc.select(&link_el)
-            .map(|el: ElementRef| {
+        let links: Vec<String> = doc.select(&link_el)
+            .map(|el| {
                 let el = el.value();
                 let rel = match el.attr("rel") {
                     Some(rel) => rel,
-                    None => return Err("no rel attribute on link element".into()),
+                    None => return Err(Error::Markup("no rel attribute on link element".into())),
                 };
                 let href = match el.attr("href") {
                     Some(href) => href,
-                    None => return Err("no href attribute on link element".into()),
+                    None => return Err(Error::Markup("no href attribute on link element".into())),
                 };
                 if !rel.contains("icon") {
-                    return Err("link[rel] does not include 'icon'".into());
+                    return Err(Error::Markup("link[rel] does not include 'icon'".into()));
                 }
-                Icon::download(&self.client, &href)
+                Ok(href.into())
             })
-            .filter_map(|icon| {
-                icon.ok()
-            })
+            .filter(|r: &Result<String>| r.is_ok())
+            .map(|r: Result<String>| r.unwrap())
             .collect();
-        icons.sort();
-        match icons.into_iter().last() {
-            Some(icon) => Ok(icon),
-            None => Err("no icons found".into()),
-        }
+        Ok(links)
     }
 }
 
@@ -154,11 +166,11 @@ pub struct Size {
 
 /// parse dimensions like "64x64".
 impl std::str::FromStr for Size {
-    type Err = Box<Error>;
+    type Err = ParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let parts: Vec<&str> = s.split('x').collect();
         if parts.len() < 2 {
-            return Err(format!("invalid dimensions: {}", s).into());
+            return Err(ParseError::Size(s.into()));
         }
         Ok(Size{
             w: parts[0].parse()?,
@@ -170,5 +182,107 @@ impl std::str::FromStr for Size {
 impl From<(u32, u32)> for Size {
     fn from(d: (u32, u32)) -> Self {
         Size{w: d.0, h: d.1}
+    }
+}
+
+#[derive(Debug)]
+pub enum Error {
+    Parse(ParseError),
+    IO(std::io::Error),
+    Http(reqwest::Error),
+    Image(image::ImageError),
+    Markup(String),
+}
+
+#[derive(Debug)]
+pub enum ParseError {
+    Int(std::num::ParseIntError),
+    Url(url::ParseError),
+    Size(String),
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Error::Parse(err) => write!(f, "parsing: {}", err),
+            Error::IO(err) => write!(f, "io: {}", err),
+            Error::Http(err) => write!(f, "http: {}", err),
+            Error::Image(err) => write!(f, "image: {}", err),
+            Error::Markup(s) => write!(f, "markup: {}", s),
+        }
+    }
+}
+
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ParseError::Int(err) => write!(f, "int: {}", err),
+            ParseError::Url(err) => write!(f, "url: {}", err),
+            ParseError::Size(err) => write!(f, "size: {}", err),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Error::Parse(err) => Some(err),
+            Error::IO(err) => Some(err),
+            Error::Http(err) => Some(err),
+            Error::Image(err) => Some(err),
+            Error::Markup(_) => None,
+        }
+    }
+}
+
+impl std::error::Error for ParseError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ParseError::Int(err) => Some(err),
+            ParseError::Url(err) => Some(err),
+            ParseError::Size(_) => None,
+        }
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Self {
+        Error::IO(err)
+    }
+}
+
+impl From<ParseError> for Error {
+    fn from(err: ParseError) -> Self {
+        Error::Parse(err)
+    }
+}
+
+impl From<reqwest::Error> for Error {
+    fn from(err: reqwest::Error) -> Self {
+        Error::Http(err)
+    }
+}
+
+impl From<image::ImageError> for Error {
+    fn from(err: image::ImageError) -> Self {
+        Error::Image(err)
+    }
+}
+
+impl From<std::num::ParseIntError> for ParseError {
+    fn from(err: std::num::ParseIntError) -> Self {
+        ParseError::Int(err)
+    }
+}
+
+impl From<url::ParseError> for ParseError {
+    fn from(err: url::ParseError) -> Self {
+        ParseError::Url(err)
+    }
+}
+
+impl From<url::ParseError> for Error {
+    fn from(err: url::ParseError) -> Self {
+        Error::Parse(ParseError::Url(err))
     }
 }
