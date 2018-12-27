@@ -3,6 +3,7 @@ use std::thread;
 use std::sync::mpsc::channel;
 use std::io::{copy, Read};
 use std::cmp::{Ordering, Ord, PartialOrd, PartialEq};
+use std::sync::Arc;
 use scraper::{Html, Selector};
 use image::{self, GenericImageView};
 use mime_sniffer::MimeTypeSniffer;
@@ -33,15 +34,16 @@ impl Inferer<reqwest::Client> {
 
 /// infer the best icon for a url by downloading icon links and comparing for
 /// size, preferring the largest. 
-impl<D: Downloader + Clone + Send + 'static> Inferer<D> {
+impl<D: Downloader + Clone + Send + Sync + 'static> Inferer<D> {
     fn infer(&self, url: &str) -> Result<Icon> {
         let (tx, tr) = channel();
+        let client = Arc::new(self.client.clone());
         let mut workers = vec![];
         for link in self.scrape(url)? {
-            let client = self.client.clone();
+            let client = client.clone();
             let tx = tx.clone();
             workers.push(thread::spawn(move || {
-                let icon = Icon::download(&client, &link);
+                let icon = Icon::download(client.as_ref(), &link);
                 tx.send(icon).expect("sending icon result over channel");
             }));
         }
