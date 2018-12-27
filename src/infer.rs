@@ -186,7 +186,7 @@ impl From<(u32, u32)> for Size {
 pub enum Error {
     Parse(ParseError),
     IO(std::io::Error),
-    Http(reqwest::Error),
+    Download(reqwest::Error),
     Image(image::ImageError),
     Markup(String),
 }
@@ -203,7 +203,7 @@ impl std::fmt::Display for Error {
         match self {
             Error::Parse(err) => write!(f, "parsing: {}", err),
             Error::IO(err) => write!(f, "io: {}", err),
-            Error::Http(err) => write!(f, "http: {}", err),
+            Error::Download(err) => write!(f, "downloading: {}", err),
             Error::Image(err) => write!(f, "image: {}", err),
             Error::Markup(s) => write!(f, "markup: {}", s),
         }
@@ -225,7 +225,7 @@ impl std::error::Error for Error {
         match self {
             Error::Parse(err) => Some(err),
             Error::IO(err) => Some(err),
-            Error::Http(err) => Some(err),
+            Error::Download(err) => Some(err),
             Error::Image(err) => Some(err),
             Error::Markup(_) => None,
         }
@@ -256,7 +256,7 @@ impl From<ParseError> for Error {
 
 impl From<reqwest::Error> for Error {
     fn from(err: reqwest::Error) -> Self {
-        Error::Http(err)
+        Error::Download(err)
     }
 }
 
