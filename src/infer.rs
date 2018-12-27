@@ -167,7 +167,7 @@ impl std::str::FromStr for Size {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let parts: Vec<&str> = s.split('x').collect();
         if parts.len() < 2 {
-            return Err(ParseError::Size(s.into()));
+            return Err(ParseError::Size(format!("input: {}", s)));
         }
         Ok(Size{
             w: parts[0].parse()?,
