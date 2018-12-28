@@ -99,7 +99,7 @@ pub trait Downloader {
 
 impl Downloader for reqwest::Client {
     fn get(&self, url: &str) -> Result<Box<Read>> {
-        Ok(Box::new(reqwest::get(url)?))
+        Ok(Box::new(reqwest::Client::get(self, url).send()?))
     }
 }
 
