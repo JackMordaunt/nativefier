@@ -4,13 +4,14 @@ use std::sync::mpsc::channel;
 use std::io::{copy, Read};
 use std::cmp::{Ordering, Ord, PartialOrd, PartialEq};
 use std::sync::Arc;
+use std::result::Result as StdResult;
 use scraper::{Html, Selector};
 use image::{self, GenericImageView};
 use mime_sniffer::MimeTypeSniffer;
 use reqwest;
 use url::Url;
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = StdResult<T, Error>;
 
 /// infer an icon using the default Inferer.
 pub fn infer_icon(url: &str) -> Result<Icon> {
@@ -34,7 +35,9 @@ impl Inferer<reqwest::Client> {
 
 /// infer the best icon for a url by downloading icon links and comparing for
 /// size, preferring the largest. 
-impl<D: Downloader + Clone + Send + Sync + 'static> Inferer<D> {
+impl<D> Inferer<D>
+    where D: Downloader + Clone + Send + Sync + 'static
+{
     fn infer(&self, url: &str) -> Result<Icon> {
         let (tx, tr) = channel();
         let client = Arc::new(self.client.clone());
@@ -54,7 +57,7 @@ impl<D: Downloader + Clone + Send + Sync + 'static> Inferer<D> {
         icons.sort();
         match icons.into_iter().last() {
             Some(icon) => Ok(icon),
-            None => Err(Error::Markup("no icons found".into())),
+            None => Err(Error::Scrape("no icons found".into())),
         }
     }
     /// Scrape icon links form the html markup at the given url.
@@ -73,14 +76,14 @@ impl<D: Downloader + Clone + Send + Sync + 'static> Inferer<D> {
                 let el = el.value();
                 let rel = match el.attr("rel") {
                     Some(rel) => rel,
-                    None => return Err(Error::Markup("no rel attribute on link element".into())),
+                    None => return Err(Error::Scrape("no rel attribute on link element".into())),
                 };
                 let href = match el.attr("href") {
                     Some(href) => href,
-                    None => return Err(Error::Markup("no href attribute on link element".into())),
+                    None => return Err(Error::Scrape("no href attribute on link element".into())),
                 };
                 if !rel.contains("icon") {
-                    return Err(Error::Markup("link[rel] does not include 'icon'".into()));
+                    return Err(Error::Scrape("link[rel] does not include 'icon'".into()));
                 }
                 Ok(href.into())
             })
@@ -166,7 +169,7 @@ pub struct Size {
 /// parse dimensions like "64x64".
 impl std::str::FromStr for Size {
     type Err = ParseError;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(s: &str) -> StdResult<Self, Self::Err> {
         let parts: Vec<&str> = s.split('x').collect();
         if parts.len() < 2 {
             return Err(ParseError::Size(format!("input: {}", s)));
@@ -186,11 +189,16 @@ impl From<(u32, u32)> for Size {
 
 #[derive(Debug)]
 pub enum Error {
+    /// Parsing failures for various primitives. 
     Parse(ParseError),
-    IO(std::io::Error),
-    Download(reqwest::Error),
+    /// Download and IO errors.  
+    /// Wraps a trait object because we don't know what concrete error the
+    /// implementor will use. 
+    Download(Box<dyn std::error::Error + Sync + Send>),
+    /// Image decoding and processing errors. 
     Image(image::ImageError),
-    Markup(String),
+    /// Scraping markup for icons. 
+    Scrape(String),
 }
 
 #[derive(Debug)]
@@ -204,10 +212,9 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Error::Parse(err) => write!(f, "parsing: {}", err),
-            Error::IO(err) => write!(f, "io: {}", err),
             Error::Download(err) => write!(f, "downloading: {}", err),
             Error::Image(err) => write!(f, "image: {}", err),
-            Error::Markup(s) => write!(f, "markup: {}", s),
+            Error::Scrape(s) => write!(f, "scraping: {}", s),
         }
     }
 }
@@ -228,7 +235,7 @@ impl std::error::Error for Error {
             Error::Parse(err) => Some(err),
             Error::Download(err) => Some(err.as_ref()),
             Error::Image(err) => Some(err),
-            Error::Markup(_) => None,
+            Error::Scrape(_) => None,
         }
     }
 }
@@ -245,7 +252,7 @@ impl std::error::Error for ParseError {
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
-        Error::IO(err)
+        Error::Download(Box::new(err))
     }
 }
 
@@ -257,7 +264,7 @@ impl From<ParseError> for Error {
 
 impl From<reqwest::Error> for Error {
     fn from(err: reqwest::Error) -> Self {
-        Error::Download(err)
+        Error::Download(Box::new(err))
     }
 }
 
