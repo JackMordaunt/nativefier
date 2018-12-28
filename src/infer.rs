@@ -226,8 +226,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Error::Parse(err) => Some(err),
-            Error::IO(err) => Some(err),
-            Error::Download(err) => Some(err),
+            Error::Download(err) => Some(err.as_ref()),
             Error::Image(err) => Some(err),
             Error::Markup(_) => None,
         }
