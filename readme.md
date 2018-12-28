@@ -16,3 +16,7 @@
     1. Infer icon from site content  
     1. Download  
     1. Add to final binary  
+
+- [ ] Support svg logos.
+- [ ] Support icon override.
+    - Supply the site to load and an alternative to scrape the icon from. 
