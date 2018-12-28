@@ -21,9 +21,9 @@ fn main() {
             .help("url of site to nativefy"))
         .subcommand(SubCommand::with_name("generate")
             .about("generates a standalone binary")
-            .arg(Arg::with_name("dir")
-                .short("d")
-                .long("dir")
+            .arg(Arg::with_name("output")
+                .short("o")
+                .long("output")
                 .takes_value(true)
                 .help("output directory for generated app, defaults to current directory")))
         .get_matches();
@@ -32,7 +32,7 @@ fn main() {
     match matches.subcommand() {
         ("generate", args) => {
             let dir = match args {
-                Some(args) => args.value_of("dir").unwrap_or(""),
+                Some(args) => args.value_of("output").unwrap_or(""),
                 None => "",
             };
             if cfg!(windows) {
