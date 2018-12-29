@@ -17,6 +17,8 @@
     1. Download  
     1. Add to final binary  
 
-- [ ] Support svg logos.
-- [ ] Support icon override.
-    - Supply the site to load and an alternative to scrape the icon from. 
+- [ ] Support svg logos.  
+- [ ] Support icon override.  
+    - Supply the site to load and an alternative to scrape the icon from.   
+- [ ] Remove dependency on `icnsify`.  
+- [ ] Don't assume icon is png. 
