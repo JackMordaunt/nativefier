@@ -46,13 +46,20 @@ impl<D> Inferer<D>
             let client = client.clone();
             let tx = tx.clone();
             workers.push(thread::spawn(move || {
-                let icon = Icon::download(client.as_ref(), &link);
-                tx.send(icon).expect("sending icon result over channel");
+                tx.send(Icon::download(client.as_ref(), &link))
+                    .expect("sending icon result over channel");
             }));
         }
         let mut icons = vec![];
         for _ in workers {
-            icons.push(tr.recv().expect("receiving icon from channel")?);
+            // FIXME: log the error. 
+            if let Ok(icon) = tr.recv().expect("receiving icon from channel") {
+                icons.push(icon);
+            }
+            // match tr.recv().expect("receiving icon from channel") {
+            //     Ok(icon) => icons.push(icon),
+            //     Err(_) => {},
+            // };
         }
         icons.sort();
         match icons.into_iter().last() {
@@ -71,6 +78,7 @@ impl<D> Inferer<D>
         body.read_to_string(&mut buf)?;
         let doc = Html::parse_document(&buf);
         let link_el = Selector::parse("link").unwrap();
+        let base = Url::parse(url)?;        
         let links: Vec<String> = doc.select(&link_el)
             .map(|el| {
                 let el = el.value();
@@ -87,8 +95,25 @@ impl<D> Inferer<D>
                 }
                 Ok(href.into())
             })
-            .filter(|r: &Result<String>| r.is_ok())
-            .map(|r: Result<String>| r.unwrap())
+            .filter(|r: &Result<String>| {
+                r.is_ok()
+            })
+            .map(|r: Result<String>| {
+                r.unwrap()
+            })
+            // FIXME: Temporary fix against bad input. Only accept .png links.
+            // TODO: Support various image formats, and don't rely on link suffixes. 
+            .filter(|link: &String| {
+                link.contains(".png")
+            })
+            .map(|link: String| {
+                if link.contains("http") {
+                   return link; 
+                }
+                base.join(&link)
+                    .expect("joining relative url to base")
+                    .into_string()
+            })
             .collect();
         Ok(links)
     }
@@ -123,14 +148,20 @@ impl Icon {
         let mut response = client.get(href)?;
         let mut icon_data: Vec<u8> = vec![];
         copy(&mut response, &mut icon_data)?;
+        let mime = match MimeTypeSniffer::sniff_mime_type(&icon_data) {
+            Some(m) => m,
+            None => return Err(Error::Scrape(format!("could not detect mime for {}", href))),
+        };
         Ok(Icon{
             source: href.into(),
             name: Url::parse(href)?.host_str().unwrap_or_else(|| "").into(),
             // Assumes the url ends with a valid file extension.
             ext: format!(".{0}", href.split('.').last().unwrap()),
-            mime: MimeTypeSniffer::sniff_mime_type(&icon_data).unwrap().into(),
+            mime: mime.into(),
             size: icon_data.len(),
-            dimensions: image::load_from_memory(&icon_data)?.dimensions().into(),
+            dimensions: image::load_from_memory(&icon_data)?
+                .dimensions()
+                .into(),
             buffer: icon_data,
         })
     }
