@@ -138,7 +138,6 @@ impl Downloader for reqwest::Client {
 pub struct Icon {
     pub source: String,
     pub name: String,
-    pub size: usize,
     pub ext: String,
     pub buffer: Vec<u8>, 
     pub dimensions: Size,
@@ -155,7 +154,6 @@ impl Icon {
             name: Url::parse(href)?.host_str().unwrap_or_else(|| "").into(),
             // Assumes the url ends with a valid file extension.
             ext: format!(".{0}", href.split('.').last().unwrap()),
-            size: icon_data.len(),
             dimensions: img.dimensions().into(),
             buffer: icon_data,
         })
