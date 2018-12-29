@@ -108,9 +108,16 @@ impl<D> Inferer<D>
                 if link.contains("http") {
                    return link; 
                 }
-                base.join(&link)
-                    .expect("joining relative url to base")
-                    .into_string()
+                match base.join(&link) {
+                    Ok(url) => url.into_string(),
+                    Err(err) => {
+                        warn!("Inferer.scrape: joining {} to {}: {}", &link, &base, err);
+                        "".into()
+                    },
+                }
+            })
+            .filter(|link: &String| {
+                !link.is_empty()
             })
             .collect();
         Ok(links)
