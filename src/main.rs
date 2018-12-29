@@ -1,5 +1,6 @@
 mod bundle;
 mod infer;
+mod error;
 
 use std::fs;
 use web_view::*;
