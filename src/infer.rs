@@ -10,6 +10,7 @@ use image::{self, GenericImageView};
 use mime_sniffer::MimeTypeSniffer;
 use reqwest;
 use url::Url;
+use log::warn;
 
 pub type Result<T> = StdResult<T, Error>;
 
@@ -52,14 +53,10 @@ impl<D> Inferer<D>
         }
         let mut icons = vec![];
         for _ in workers {
-            // FIXME: log the error. 
-            if let Ok(icon) = tr.recv().expect("receiving icon from channel") {
-                icons.push(icon);
-            }
-            // match tr.recv().expect("receiving icon from channel") {
-            //     Ok(icon) => icons.push(icon),
-            //     Err(_) => {},
-            // };
+            match tr.recv().expect("receiving icon from channel") {
+                Ok(icon) => icons.push(icon),
+                Err(err) => warn!("downloading icon: {}", err),
+            };
         }
         icons.sort();
         match icons.into_iter().last() {

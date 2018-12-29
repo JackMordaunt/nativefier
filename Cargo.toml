@@ -19,6 +19,7 @@ mime-sniffer = "0.1.2"
 mime = "0.3.12"
 image = "*"
 tempfile = "3"
+log = "0.4"
 
 [build-dependencies]
 winres = "0.1"

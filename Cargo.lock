@@ -748,6 +748,7 @@ dependencies = [
  "handlebars 1.2.1-alpha.0 (git+https://github.com/sunng87/handlebars-rust.git)",
  "hyper 0.12.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "image 0.20.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mime 0.3.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "mime-sniffer 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.9.5 (registry+https://github.com/rust-lang/crates.io-index)",
