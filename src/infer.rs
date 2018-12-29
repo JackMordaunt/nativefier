@@ -10,7 +10,7 @@ use image::{self, GenericImageView};
 use mime_sniffer::MimeTypeSniffer;
 use reqwest;
 use url::Url;
-use log::warn;
+use log::debug;
 use crate::error::{Error, ParseError};
 
 pub type Result<T> = StdResult<T, Error>;
@@ -56,7 +56,7 @@ impl<D> Inferer<D>
         for _ in workers {
             match tr.recv().expect("receiving icon from channel") {
                 Ok(icon) => icons.push(icon),
-                Err(err) => warn!("downloading icon: {}", err),
+                Err(err) => debug!("downloading icon: {}", err),
             };
         }
         icons.sort();
@@ -89,15 +89,18 @@ impl<D> Inferer<D>
                     None => return Err(Error::Scrape("no href attribute on link element".into())),
                 };
                 if !rel.contains("icon") {
-                    return Err(Error::Scrape("link[rel] does not include 'icon'".into()));
+                    return Err(Error::Scrape("'rel' attribute does not include 'icon'".into()));
                 }
                 Ok(href.into())
             })
-            .filter(|r: &Result<String>| {
-                r.is_ok()
-            })
             .map(|r: Result<String>| {
-                r.unwrap()
+                match r {
+                    Ok(link) => link,
+                    Err(err) => {
+                        debug!("malformed link: {}", err);
+                        "".into()
+                    },
+                }
             })
             // FIXME: Temporary fix against bad input. Only accept .png links.
             // TODO: Support various image formats, and don't rely on link suffixes. 
@@ -111,7 +114,7 @@ impl<D> Inferer<D>
                 match base.join(&link) {
                     Ok(url) => url.into_string(),
                     Err(err) => {
-                        warn!("Inferer.scrape: joining {} to {}: {}", &link, &base, err);
+                        debug!("joining {} to {}: {}", &link, &base, err);
                         "".into()
                     },
                 }
