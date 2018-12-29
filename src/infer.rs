@@ -46,16 +46,18 @@ impl<D> Inferer<D>
             let client = client.clone();
             let tx = tx.clone();
             workers.push(thread::spawn(move || {
-                tx.send(Icon::download(client.as_ref(), &link))
-                    .expect("sending icon result over channel");
+                let icon = match Icon::download(client.as_ref(), &link) {
+                    Ok(icon) => Some(icon),
+                    Err(err) => {debug!("downloading icon: {}", err); None},
+                };
+                tx.send(icon).expect("sending icon over channel");
             }));
         }
         let mut icons = vec![];
         for _ in workers {
-            match tr.recv().expect("receiving icon from channel") {
-                Ok(icon) => icons.push(icon),
-                Err(err) => debug!("downloading icon: {}", err),
-            };
+            if let Some(icon) = tr.recv().expect("receiving icon from channel") {
+                icons.push(icon);
+            }
         }
         icons.sort();
         match icons.into_iter().last() {
