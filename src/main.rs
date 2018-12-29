@@ -6,10 +6,12 @@ use std::fs;
 use web_view::*;
 use clap::{Arg, App, SubCommand};
 use tempfile::tempdir;
+use pretty_env_logger;
 use crate::bundle::Bundler;
 use crate::infer::infer_icon;
 
 fn main() {
+    pretty_env_logger::init();
     let matches = App::new("nativefier")
         .version("0.0.1")
         .author("Jack Mordaunt <jackmordaunt@gmail.com>")
