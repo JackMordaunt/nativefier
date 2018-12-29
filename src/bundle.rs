@@ -8,7 +8,6 @@ use std::{
 };
 use handlebars::Handlebars;
 use serde_json::json;
-use crate::infer;
 
 /// Bundler is any object that can produce an executable bundle.
 /// This allows us to be polymorphic across operating systems (macos, windows,
@@ -19,9 +18,14 @@ pub trait Bundler {
 
 // Darwin bundles a macos app bundle. 
 pub struct Darwin<'a> {
+    /// Output directory. Defaults to current working directory. 
     pub dir: &'a str,
+    /// Title of the application. 
     pub title: &'a str,
+    /// Url to wrap. 
     pub url: &'a str,
+    /// Filepath to icon.
+    pub icon: &'a str,
 }
 
 impl Bundler for Darwin<'_> {
@@ -52,9 +56,8 @@ impl Bundler for Darwin<'_> {
             .arg("+x")
             .arg(&wrapper)
             .output()?;
-        let icon = infer::infer_icon(self.url)?;
         let icon_path = app.join("Contents/Resources/icon.png");
-        fs::write(&icon_path, icon)?;
+        fs::copy(&self.icon, &icon_path)?;
         Command::new("icnsify")
             .arg("-i")
             .arg(&icon_path)

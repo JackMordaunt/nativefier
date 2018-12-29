@@ -18,6 +18,7 @@ chrono = "0.4.*"
 mime-sniffer = "0.1.2"
 mime = "0.3.12"
 image = "*"
+tempfile = "3"
 
 [build-dependencies]
 winres = "0.1"

@@ -1,10 +1,12 @@
-use web_view::*;
-use clap::{Arg, App, SubCommand};
-
 mod bundle;
 mod infer;
 
+use std::fs;
+use web_view::*;
+use clap::{Arg, App, SubCommand};
+use tempfile::tempdir;
 use crate::bundle::Bundler;
+use crate::infer::infer_icon;
 
 fn main() {
     let matches = App::new("nativefier")
@@ -25,16 +27,31 @@ fn main() {
                 .short("o")
                 .long("output")
                 .takes_value(true)
-                .help("output directory for generated app, defaults to current directory")))
+                .help("output directory for generated app, defaults to current directory"))
+            .arg(Arg::with_name("icon-override")
+                .short("f")
+                .long("icon-override")
+                .takes_value(true)
+                .help("an alternative url to scrape the icon from")))
         .get_matches();
     let title = matches.value_of("title").expect("parsing title");
     let url = matches.value_of("url").expect("parsing url");
     match matches.subcommand() {
         ("generate", args) => {
-            let dir = match args {
-                Some(args) => args.value_of("output").unwrap_or(""),
-                None => "",
+            let (dir, icon_url) = match args {
+                Some(args) => {
+                    (
+                        args.value_of("output").unwrap_or(""),
+                        args.value_of("icon-override").unwrap_or(&url),
+                    )
+                },
+                None => ("", url),
             };
+            let icon = infer_icon(&icon_url).expect("inferring icon");
+            let icon_path = tempdir().expect("opening temporary directory")
+                .into_path()
+                .join("icon.png");
+            fs::write(&icon_path, &icon).expect("writing icon to disk");
             if cfg!(windows) {
                 bundle::Windows {
                     dir: &dir,
@@ -46,6 +63,7 @@ fn main() {
                     dir: &dir,
                     title: &title,
                     url: &url,
+                    icon: &icon_path.to_string_lossy(),
                 }.bundle().expect("bundling MacOS app");
             }
         },
