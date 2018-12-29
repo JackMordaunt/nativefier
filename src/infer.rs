@@ -7,7 +7,6 @@ use std::sync::Arc;
 use std::result::Result as StdResult;
 use scraper::{Html, Selector};
 use image::{self, GenericImageView};
-use mime_sniffer::MimeTypeSniffer;
 use reqwest;
 use url::Url;
 use log::debug;
@@ -102,11 +101,6 @@ impl<D> Inferer<D>
                     },
                 }
             })
-            // FIXME: Temporary fix against bad input. Only accept .png links.
-            // TODO: Support various image formats, and don't rely on link suffixes. 
-            .filter(|link: &String| {
-                link.contains(".png")
-            })
             .map(|link: String| {
                 if link.contains("http") {
                    return link; 
@@ -146,7 +140,6 @@ pub struct Icon {
     pub name: String,
     pub size: usize,
     pub ext: String,
-    pub mime: String,
     pub buffer: Vec<u8>, 
     pub dimensions: Size,
 }
@@ -156,20 +149,14 @@ impl Icon {
         let mut response = client.get(href)?;
         let mut icon_data: Vec<u8> = vec![];
         copy(&mut response, &mut icon_data)?;
-        let mime = match MimeTypeSniffer::sniff_mime_type(&icon_data) {
-            Some(m) => m,
-            None => return Err(Error::Scrape(format!("could not detect mime for {}", href))),
-        };
+        let img = image::load_from_memory(&icon_data)?;
         Ok(Icon{
             source: href.into(),
             name: Url::parse(href)?.host_str().unwrap_or_else(|| "").into(),
             // Assumes the url ends with a valid file extension.
             ext: format!(".{0}", href.split('.').last().unwrap()),
-            mime: mime.into(),
             size: icon_data.len(),
-            dimensions: image::load_from_memory(&icon_data)?
-                .dimensions()
-                .into(),
+            dimensions: img.dimensions().into(),
             buffer: icon_data,
         })
     }
