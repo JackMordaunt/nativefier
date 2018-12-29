@@ -13,8 +13,6 @@ use url::Url;
 use log::debug;
 use crate::error::{Error, ParseError};
 
-pub type Result<T> = StdResult<T, Error>;
-
 /// infer an icon using the default Inferer.
 pub fn infer_icon(url: &str) -> Result<Icon> {
     Inferer::default().infer(url)
@@ -225,3 +223,5 @@ impl From<(u32, u32)> for Size {
         Size{w: d.0, h: d.1}
     }
 }
+
+pub type Result<T> = StdResult<T, Error>;
