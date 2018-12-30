@@ -149,6 +149,7 @@ pub struct Icon {
 }
 
 impl Icon {
+    /// Download the image at href and use it to create an icon. 
     fn download(client: &impl Downloader, href: &str) -> Result<Icon> {
         let mut response = client.get(href)?;
         let mut icon_data: Vec<u8> = vec![];
