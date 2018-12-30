@@ -2,10 +2,8 @@ mod bundle;
 mod infer;
 mod error;
 
-use std::fs;
 use web_view::*;
 use clap::{Arg, App, SubCommand};
-use tempfile::tempdir;
 use pretty_env_logger;
 use crate::bundle::Bundler;
 use crate::infer::infer_icon;
@@ -50,15 +48,12 @@ fn main() {
                 },
                 None => ("", url),
             };
-            let icon = infer_icon(&icon_url)
-                .expect("inferring icon")
-                .into_png()
-                .expect("converting icon to png");
-            let icon_path = tempdir()
-                .expect("opening temporary directory")
-                .into_path()
-                .join(format!("icon.{}", &icon.ext));
-            fs::write(&icon_path, &icon).expect("writing icon to disk");
+            let icon = infer_icon(&icon_url).expect("inferring icon");
+            // let icon_path = tempdir()
+            //     .expect("opening temporary directory")
+            //     .into_path()
+            //     .join(format!("icon.{}", &icon.ext));
+            // fs::write(&icon_path, &icon).expect("writing icon to disk");
             if cfg!(windows) {
                 bundle::Windows {
                     dir: &dir,
@@ -70,7 +65,7 @@ fn main() {
                     dir: &dir,
                     title: &title,
                     url: &url,
-                    icon: &icon_path.to_string_lossy(),
+                    icon: icon,
                 }.bundle().expect("bundling MacOS app");
             }
         },
