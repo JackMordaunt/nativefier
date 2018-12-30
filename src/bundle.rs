@@ -31,25 +31,30 @@ pub struct Darwin<'a> {
 
 impl Bundler for Darwin<'_> {
     fn bundle(self) -> Result<(), Box<Error>> {
+        let executable = self.title.chars()
+            .filter(|c| !c.is_whitespace())
+            .map(|c| c.to_ascii_lowercase())
+            .collect::<String>();
+        println!("executable: {}", &executable);
         let app = PathBuf::from(&self.dir).join(format!("{0}.app", &self.title));
         for dir in ["Contents/MacOS", "Contents/Resources"].iter() {
             fs::create_dir_all(app.join(dir))?;
         }
         fs::copy(
             env::current_exe()?.to_path_buf(),
-            app.join(format!("Contents/MacOS/{0}", &self.title)),
+            app.join(format!("Contents/MacOS/{0}", &executable)),
         )?;
         let h = Handlebars::new();
         let plist = app.join("Contents/Info.plist");
         fs::File::create(&plist)?
             .write_all(h.render_template(PLIST.trim(), &json!({
-                "executable": &self.title,
+                "executable": &executable,
                 "url": &self.url,
             }))?.as_bytes())?;
-        let wrapper = app.join(format!("Contents/MacOS/{0}.sh", &self.title));
+        let wrapper = app.join(format!("Contents/MacOS/{0}.sh", &executable));
         fs::File::create(&wrapper)?
             .write_all(h.render_template(BASH_WRAPPER.trim(), &json!({
-                "executable": &self.title,
+                "executable": &executable,
                 "title": &self.title,
                 "url": &self.url,
             }))?.as_bytes())?;
@@ -148,7 +153,7 @@ const PLIST: &str = r#"
 const BASH_WRAPPER: &str = r#"
 #!/usr/bin/env bash
 DIR=$(cd "$(dirname "$0")"; pwd)
-$DIR/{{executable}} {{title}} "{{url}}"
+"$DIR/{{executable}}" "{{title}}" "{{url}}"
 "#;
 
 /// .sed files are config files for "iexpress", which creates self extracting 
@@ -197,5 +202,5 @@ SourceFiles0={{parent_directory}}
 
 /// Batch script that invokes the generated executable with the given arguments. 
 const BATCH_WRAPPER: &str = r#"
-cmd.exe /c start {{executable}} {{title}} "{{url}}"
+cmd.exe /c start "{{executable}}" "{{title}}" "{{url}}"
 "#;
