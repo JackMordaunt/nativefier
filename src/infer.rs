@@ -136,10 +136,15 @@ impl Downloader for reqwest::Client {
 /// Icon is icon detected for a website. 
 #[derive(Eq, Debug)]
 pub struct Icon {
+    /// Uri (typically url) with which this icon was loaded from. 
     pub source: String,
+    /// Name of the icon. May be empty. 
     pub name: String,
+    /// Extension for the given image type. 
     pub ext: String,
+    /// Buffer containing the raw image data. 
     pub buffer: Vec<u8>, 
+    /// Size of the image in pixels. 
     pub dimensions: Size,
 }
 
@@ -148,7 +153,9 @@ impl Icon {
         let mut response = client.get(href)?;
         let mut icon_data: Vec<u8> = vec![];
         copy(&mut response, &mut icon_data)?;
-        let img = image::load_from_memory(&icon_data)?;
+        // Fails on svg edge-case. Since we want to support common web images, 
+        // we need to handle svgs. 
+        let img = image::load_from_memory(&icon_data)?;  
         Ok(Icon{
             source: href.into(),
             name: Url::parse(href)?.host_str().unwrap_or_else(|| "").into(),
