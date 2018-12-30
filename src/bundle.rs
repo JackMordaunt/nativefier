@@ -8,12 +8,13 @@ use std::{
 };
 use handlebars::Handlebars;
 use serde_json::json;
+use crate::infer;
 
 /// Bundler is any object that can produce an executable bundle.
 /// This allows us to be polymorphic across operating systems (macos, windows,
 /// linux) and their various ways of handling an app bundle. 
 pub trait Bundler {
-    fn bundle(&self) -> Result<(), Box<Error>>;
+    fn bundle(self) -> Result<(), Box<Error>>;
 }
 
 // Darwin bundles a macos app bundle. 
@@ -25,11 +26,11 @@ pub struct Darwin<'a> {
     /// Url to wrap. 
     pub url: &'a str,
     /// Filepath to icon.
-    pub icon: &'a str,
+    pub icon: infer::Icon,
 }
 
 impl Bundler for Darwin<'_> {
-    fn bundle(&self) -> Result<(), Box<Error>> {
+    fn bundle(self) -> Result<(), Box<Error>> {
         let app = PathBuf::from(&self.dir).join(format!("{0}.app", &self.title));
         for dir in ["Contents/MacOS", "Contents/Resources"].iter() {
             fs::create_dir_all(app.join(dir))?;
@@ -57,7 +58,7 @@ impl Bundler for Darwin<'_> {
             .arg(&wrapper)
             .output()?;
         let icon_path = app.join("Contents/Resources/icon.png");
-        fs::copy(&self.icon, &icon_path)?;
+        fs::File::create(&icon_path)?.write_all(self.icon.into_png()?.as_ref())?;
         Command::new("icnsify")
             .arg("-i")
             .arg(&icon_path)
@@ -82,7 +83,7 @@ pub struct Windows<'a> {
 /// and run.  
 impl Bundler for Windows<'_> {
     /// TODO(jfm): compile icon. 
-    fn bundle(&self) -> Result<(), Box<Error>> {
+    fn bundle(self) -> Result<(), Box<Error>> {
         fs::create_dir_all(&self.dir)?;
         let h = Handlebars::new();
         let bin = PathBuf::from(&self.dir).join(format!("{0}.exe", &self.title));
