@@ -155,14 +155,20 @@ impl Icon {
         copy(&mut response, &mut icon_data)?;
         // Fails on svg edge-case. Since we want to support common web images, 
         // we need to handle svgs. 
+        let kind = image::guess_format(&icon_data)?;
+        let ext = match kind {
+            image::PNG => "png",
+            image::ICO => "ico",
+            image::JPEG => "jpeg",
+            _ => "",
+        };
         let img = image::load_from_memory(&icon_data)?;  
         Ok(Icon{
             source: href.into(),
             name: Url::parse(href)?.host_str().unwrap_or_else(|| "").into(),
-            // Assumes the url ends with a valid file extension.
-            ext: format!(".{0}", href.split('.').last().unwrap()),
             dimensions: img.dimensions().into(),
             buffer: icon_data,
+            ext: ext.into(),
         })
     }
 }
