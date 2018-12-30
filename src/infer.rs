@@ -143,7 +143,7 @@ pub struct Icon {
     /// Extension for the given image type. 
     pub ext: String,
     /// Buffer containing the raw image data. 
-    pub buffer: Vec<u8>, 
+    pub buffer: Vec<u8>,
     /// Size of the image in pixels. 
     pub dimensions: Size,
 }
@@ -153,8 +153,8 @@ impl Icon {
         let mut response = client.get(href)?;
         let mut icon_data: Vec<u8> = vec![];
         copy(&mut response, &mut icon_data)?;
-        // Fails on svg edge-case. Since we want to support common web images, 
-        // we need to handle svgs. 
+        // FIXME: Fails on svg case, since image crate doesn't suppport svg.
+        // TODO: Handle svg. 
         let kind = image::guess_format(&icon_data)?;
         let ext = match kind {
             image::PNG => "png",
@@ -171,6 +171,65 @@ impl Icon {
             ext: ext.into(),
         })
     }
+}
+
+impl Icon {
+    /// Transform icon image into png. 
+    pub fn into_png(self) -> Result<Icon> {
+        if self.ext == "png" {
+            return Ok(self);
+        }
+        let Size {w, h} = self.dimensions;
+        let current = image::load_from_memory(self.buffer.as_ref())?;
+        let mut buffer: Vec<u8> = vec![];
+        image::png::PNGEncoder::new(&mut buffer)
+            .encode(&current.raw_pixels(), w, h, image::RGBA(24))?;
+        Ok(Icon {
+            buffer: buffer,
+            ext: "png".into(),
+            name: self.name,
+            source: self.source,
+            dimensions: self.dimensions,
+        })
+    }
+    /// Transform icon image into ico. 
+    pub fn into_ico(self) -> Result<Icon> {
+        if self.ext == "ico" {
+            return Ok(self);
+        }
+        let Size {w, h} = self.dimensions;
+        let current = image::load_from_memory(self.buffer.as_ref())?;
+        let mut buffer: Vec<u8> = vec![];
+        image::ico::ICOEncoder::new(&mut buffer)
+            .encode(&current.raw_pixels(), w, h, image::RGBA(24))?;
+        Ok(Icon {
+            buffer: buffer,
+            ext: "ico".into(),
+            name: self.name,
+            source: self.source,
+            dimensions: self.dimensions,
+        })
+    }
+
+    // pub fn into_icns(self) -> Result<Icon> {
+    //     if self.ext == "icns" {
+    //         return Ok(self);
+    //     }
+    //     let Size {w, h} = self.dimensions;
+    //     let current = image::load_from_memory(self.buffer.as_ref())?;
+    //     let mut buffer: Vec<u8> = vec![];
+    //     // image::ico::ICOEncoder::new(&mut buffer)
+    //     //     .encode(&current.raw_pixels(), w, h, image::RGBA(24))?;
+    //     // icns::Encoder::new(&mut buffer)
+    //     //     .encode(&current.raw_pixels(), w, h)?;
+    //     Ok(Icon {
+    //         buffer: buffer,
+    //         ext: "icns".into(),
+    //         name: self.name,
+    //         source: self.source,
+    //         dimensions: self.dimensions,
+    //     })
+    // }
 }
 
 impl PartialOrd for Icon {
@@ -197,7 +256,7 @@ impl std::convert::AsRef<[u8]> for Icon {
     }
 }
 
-#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd, Clone)]
 pub struct Size {
     pub w: u32,
     pub h: u32,
