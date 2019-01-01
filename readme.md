@@ -13,3 +13,5 @@
 - [x] Support icon override.  
 - [x] Replace dependency [`icns`](https://github.com/jackmordaunt/icns) with [`icns-rs`](https://github.com/jackmordaunt/icns-rs) for pure Rust goodness.  
 - [ ] Create simple and elegant GUI (make `nativefier` accessible to those that can't use the command line). 
+- [ ] Integrate with chrome via the Chrome DevTools Protocol. 
+- [ ] Integrate with this [icon repository](https://github.com/jiahaog/nativefier-icons).  
