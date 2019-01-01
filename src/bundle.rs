@@ -36,7 +36,6 @@ impl Bundler for Darwin<'_> {
             .filter(|c| !c.is_whitespace())
             .map(|c| c.to_ascii_lowercase())
             .collect::<String>();
-        println!("executable: {}", &executable);
         let app = PathBuf::from(&self.dir).join(format!("{0}.app", &self.title));
         for dir in ["Contents/MacOS", "Contents/Resources"].iter() {
             fs::create_dir_all(app.join(dir))?;
