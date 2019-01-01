@@ -6,7 +6,7 @@ use std::cmp::{Ordering, Ord, PartialOrd, PartialEq};
 use std::sync::Arc;
 use std::result::Result as StdResult;
 use scraper::{Html, Selector};
-use image::{self, GenericImageView};
+use image;
 use reqwest;
 use url::Url;
 use log::debug;
@@ -134,7 +134,7 @@ impl Downloader for reqwest::Client {
 }
 
 /// Icon is icon detected for a website. 
-#[derive(Eq, Debug)]
+#[derive(Debug)]
 pub struct Icon {
     /// Uri (typically url) with which this icon was loaded from. 
     pub source: String,
@@ -142,10 +142,8 @@ pub struct Icon {
     pub name: String,
     /// Extension for the given image type. 
     pub ext: String,
-    /// Buffer containing the raw image data. 
-    pub buffer: Vec<u8>,
-    /// Size of the image in pixels. 
-    pub dimensions: Size,
+    /// Container for the image data. 
+    pub img: image::RgbaImage,
 }
 
 impl Icon {
@@ -167,53 +165,13 @@ impl Icon {
         Ok(Icon{
             source: href.into(),
             name: Url::parse(href)?.host_str().unwrap_or_else(|| "").into(),
-            dimensions: img.dimensions().into(),
-            buffer: icon_data,
+            img: img.to_rgba(),
             ext: ext.into(),
         })
     }
-    /// Transform icon image into png. 
-    pub fn into_png(self) -> Result<Icon> {
-        if self.ext == "png" {
-            return Ok(self);
-        }
-        let Size {w, h} = self.dimensions;
-        let current = image::load_from_memory(self.buffer.as_ref())?;
-        let mut buffer: Vec<u8> = vec![];
-        image::png::PNGEncoder::new(&mut buffer)
-            .encode(&current.raw_pixels(), w, h, image::RGBA(24))?;
-        Ok(Icon {
-            buffer: buffer,
-            ext: "png".into(),
-            name: self.name,
-            source: self.source,
-            dimensions: self.dimensions,
-        })
-    }
-    /// Transform icon image into ico. 
-    pub fn into_ico(self) -> Result<Icon> {
-        if self.ext == "ico" {
-            return Ok(self);
-        }
-        let Size {w, h} = self.dimensions;
-        let current = image::load_from_memory(self.buffer.as_ref())?;
-        let mut buffer: Vec<u8> = vec![];
-        image::ico::ICOEncoder::new(&mut buffer)
-            .encode(&current.raw_pixels(), w, h, image::RGBA(24))?;
-        Ok(Icon {
-            buffer: buffer,
-            ext: "ico".into(),
-            name: self.name,
-            source: self.source,
-            dimensions: self.dimensions,
-        })
-    }
-    /// Returns an image object for this Icon. 
-    /// Will fail if buffer contains incompatible image format or is corrupt. 
-    pub fn as_img(&self) -> Result<image::DynamicImage> {
-        Ok(image::load_from_memory(&self.buffer)?)
-    }
 }
+
+impl Eq for Icon {}
 
 impl PartialOrd for Icon {
     fn partial_cmp(&self, other: &Icon) -> Option<Ordering> {
@@ -223,19 +181,16 @@ impl PartialOrd for Icon {
 
 impl Ord for Icon {
     fn cmp(&self, other: &Icon) -> Ordering {
-        self.dimensions.cmp(&other.dimensions)
+        let left: Size = self.img.dimensions().into();
+        let right: Size = other.img.dimensions().into();
+        left.cmp(&right)
     }
 }
 
 impl PartialEq for Icon {
     fn eq(&self, other: &Icon) -> bool {
-        self.name == other.name && self.dimensions == other.dimensions 
-    }
-}
-
-impl std::convert::AsRef<[u8]> for Icon {
-    fn as_ref(&self) -> &[u8] {
-        &self.buffer
+        self.name == other.name &&
+        self.img.dimensions() == other.img.dimensions() 
     }
 }
 

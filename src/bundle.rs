@@ -66,7 +66,7 @@ impl Bundler for Darwin<'_> {
         let icon_path = app.join("Contents/Resources/icon.icns");
         let icon_file = fs::File::create(&icon_path)?;
         icns::Encoder::new(BufWriter::new(icon_file))
-            .encode(&self.icon.as_img()?.to_rgba())?;
+            .encode(&self.icon.img)?;
         Ok(())
     }
 }
