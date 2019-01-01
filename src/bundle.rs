@@ -3,11 +3,12 @@ use std::{
     fs,
     error::Error,
     path::PathBuf,
-    io::prelude::*,
     process::Command,
 };
+use std::io::{BufWriter, Write};
 use handlebars::Handlebars;
 use serde_json::json;
+use icns;
 use crate::infer;
 
 /// Bundler is any object that can produce an executable bundle.
@@ -62,14 +63,10 @@ impl Bundler for Darwin<'_> {
             .arg("+x")
             .arg(&wrapper)
             .output()?;
-        let icon_path = app.join("Contents/Resources/icon.png");
-        fs::File::create(&icon_path)?.write_all(self.icon.into_png()?.as_ref())?;
-        Command::new("icnsify")
-            .arg("-i")
-            .arg(&icon_path)
-            .arg("-o")
-            .arg(app.join("Contents/Resources/icon.icns"))
-            .output()?;
+        let icon_path = app.join("Contents/Resources/icon.icns");
+        let icon_file = fs::File::create(&icon_path)?;
+        icns::Encoder::new(BufWriter::new(icon_file))
+            .encode(&self.icon.as_img()?.to_rgba())?;
         Ok(())
     }
 }

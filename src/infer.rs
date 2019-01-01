@@ -149,7 +149,7 @@ pub struct Icon {
 }
 
 impl Icon {
-    /// Download the image at href and use it to create an icon. 
+     /// Download the image at href and use it to create an icon. 
     fn download(client: &impl Downloader, href: &str) -> Result<Icon> {
         let mut response = client.get(href)?;
         let mut icon_data: Vec<u8> = vec![];
@@ -172,9 +172,6 @@ impl Icon {
             ext: ext.into(),
         })
     }
-}
-
-impl Icon {
     /// Transform icon image into png. 
     pub fn into_png(self) -> Result<Icon> {
         if self.ext == "png" {
@@ -211,26 +208,11 @@ impl Icon {
             dimensions: self.dimensions,
         })
     }
-
-    // pub fn into_icns(self) -> Result<Icon> {
-    //     if self.ext == "icns" {
-    //         return Ok(self);
-    //     }
-    //     let Size {w, h} = self.dimensions;
-    //     let current = image::load_from_memory(self.buffer.as_ref())?;
-    //     let mut buffer: Vec<u8> = vec![];
-    //     // image::ico::ICOEncoder::new(&mut buffer)
-    //     //     .encode(&current.raw_pixels(), w, h, image::RGBA(24))?;
-    //     // icns::Encoder::new(&mut buffer)
-    //     //     .encode(&current.raw_pixels(), w, h)?;
-    //     Ok(Icon {
-    //         buffer: buffer,
-    //         ext: "icns".into(),
-    //         name: self.name,
-    //         source: self.source,
-    //         dimensions: self.dimensions,
-    //     })
-    // }
+    /// Returns an image object for this Icon. 
+    /// Will fail if buffer contains incompatible image format or is corrupt. 
+    pub fn as_img(&self) -> Result<image::DynamicImage> {
+        Ok(image::load_from_memory(&self.buffer)?)
+    }
 }
 
 impl PartialOrd for Icon {
