@@ -12,3 +12,4 @@
     - [ ] svg  
 - [x] Support icon override.  
 - [ ] Remove dependency on `icnsify`.  
+- [ ] Create simple and elegant GUI (make `nativefier` accessible to those that can't use the command line). 
