@@ -49,11 +49,6 @@ fn main() {
                 None => ("", url),
             };
             let icon = infer_icon(&icon_url).expect("inferring icon");
-            // let icon_path = tempdir()
-            //     .expect("opening temporary directory")
-            //     .into_path()
-            //     .join(format!("icon.{}", &icon.ext));
-            // fs::write(&icon_path, &icon).expect("writing icon to disk");
             if cfg!(windows) {
                 bundle::Windows {
                     dir: &dir,
