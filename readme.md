@@ -6,7 +6,7 @@ Inspired by [jiahaog/nativefier](https://github.com/jiahaog/nativefier).
 
 ## Features  
 
-- Tiny generated app size, `8MB` instead of `80MB`
+- Tiny generated app size, `3MB` instead of `80MB`
 - Native webviews (Webkit, MSHTML) instead of bundling a whole browser (looking at you, Electron)  
 - MacOS (Windows and Linux planned)  
 - Standalone binary which does not require a toolchain (unlike [jiahaog/nativefier](https://github.com/jiahaog/nativefier) which requires the `nodejs` toolchain)  
