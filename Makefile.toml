@@ -1,0 +1,19 @@
+[tasks.build]
+command = "cargo"
+args = ["build", "--release"]
+
+
+[tasks.compress]
+command = "upx"
+args = ["target/release/nativefier"]
+
+[tasks.copy]
+command = "cp"
+args = ["target/release/nativefier", "~/.cargo/bin/nativefier"]
+
+[tasks.install]
+dependencies = [
+    "build",
+    "compress",
+    "copy",
+]
