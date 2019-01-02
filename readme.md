@@ -15,3 +15,4 @@
 - [ ] Create simple and elegant GUI (make `nativefier` accessible to those that can't use the command line). 
 - [ ] Integrate with chrome via the Chrome DevTools Protocol. 
 - [ ] Integrate with this [icon repository](https://github.com/jiahaog/nativefier-icons).  
+- [ ] Inject JS/CSS for customisable experience.  
