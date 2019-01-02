@@ -1,6 +1,19 @@
 # nativefier 
 
-> Create native apps for your favourite websites. 
+> Create native apps for your favourite websites.
+
+Inspired by [jiahaog/nativefier](https://github.com/jiahaog/nativefier). 
+
+## Features  
+
+- Tiny generated app size, `8MB` instead of `80MB`
+- Native webviews (Webkit, MSHTML) instead of bundling a whole browser (looking at you, Electron)  
+- MacOS (Windows and Linux planned)  
+- Standalone binary which does not require a toolchain (unlike [jiahaog/nativefier](https://github.com/jiahaog/nativefier) which requires the `nodejs` toolchain)  
+
+## Caveats  
+
+- Compatibility with websites is dependent on the built-in webview for the OS  
 
 ## Key Components 
 
