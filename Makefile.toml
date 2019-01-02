@@ -8,8 +8,9 @@ command = "upx"
 args = ["target/release/nativefier"]
 
 [tasks.copy]
-command = "cp"
-args = ["target/release/nativefier", "~/.cargo/bin/nativefier"]
+script = [
+    "cp -f -v target/release/nativefier ~/.cargo/bin/nativefier"
+]
 
 [tasks.install]
 dependencies = [
