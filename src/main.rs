@@ -12,7 +12,7 @@ use crate::infer::{infer_icon, infer_name};
 fn main() {
     pretty_env_logger::init();
     let matches = App::new("nativefier")
-        .version("0.0.1")
+        .version("0.2.0")
         .author("Jack Mordaunt <jackmordaunt@gmail.com>")
         .about("Create native apps for your favourite site!")
         .arg(Arg::with_name("url")
