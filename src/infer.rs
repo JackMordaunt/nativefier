@@ -12,9 +12,40 @@ use url::Url;
 use log::debug;
 use crate::error::{Error, ParseError};
 
-/// infer an icon using the default Inferer.
-pub fn infer_icon(url: &str) -> Result<Icon> {
-    Inferer::default().infer(url)
+pub type Result<T> = StdResult<T, Error>;
+
+/// Infer an icon using the default Inferer.
+pub fn infer_icon(url: &Url) -> Result<Icon> {
+    Inferer::default().infer(&url.clone().into_string())
+}
+
+/// Infer an application name from a url. 
+/// 
+/// Note: [jiahaog/nativefier](https://github.com/jiahaog/nativefier) infers the 
+/// name from the html <title> tag, whereas we just inspect the url's hostname.
+/// 
+/// This is quicker (no io), but doesn't allow for "pretty" titles (with capital
+/// letters, whitespace, etc). 
+pub fn infer_name(url: &Url) -> Result<String> {
+    let host = match url.host_str() {
+        Some(host) => host,
+        None => return Err(Error::InferName {
+            url: url.clone(),
+            reason: "url does not include hostname".into(),
+        }),
+    };
+    // If there is two dots eg www.example.com, take the middle part "example"
+    // as the name. 
+    // If there is one dot eg soundcloud.com, take the first part "soundcloud"
+    // as the name. 
+    match host.matches(".").count() {
+        1 => Ok(host.split(".").nth(0).unwrap().into()),
+        2 => Ok(host.split(".").nth(1).unwrap().into()),
+        _ => Err(Error::InferName {
+            url: url.clone(),
+            reason: "url contains an uncommon hostname format".into(),
+        }),
+    }
 }
 
 /// Inferer infers the best icon for a given url. 
@@ -220,5 +251,3 @@ impl From<(u32, u32)> for Size {
         Size{w: d.0, h: d.1}
     }
 }
-
-pub type Result<T> = StdResult<T, Error>;

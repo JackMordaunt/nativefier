@@ -15,6 +15,9 @@ pub enum Error {
     Image(image::ImageError),
     /// Scraping markup for icons. 
     Scrape(String),
+    // InferName captures errors that occur while trying to infer app name from 
+    // a url. 
+    InferName { url: url::Url, reason: String },
 }
 
 #[derive(Debug)]
@@ -31,6 +34,7 @@ impl std::fmt::Display for Error {
             Error::Download(err) => write!(f, "downloading: {}", err),
             Error::Image(err) => write!(f, "image: {}", err),
             Error::Scrape(s) => write!(f, "scraping: {}", s),
+            Error::InferName {url, reason} => write!(f, "inferring name for {}: {}", url, reason),
         }
     }
 }
@@ -51,7 +55,7 @@ impl StdError for Error {
             Error::Parse(err) => Some(err),
             Error::Download(err) => Some(err.as_ref()),
             Error::Image(err) => Some(err),
-            Error::Scrape(_) => None,
+            _ => None,
         }
     }
 }

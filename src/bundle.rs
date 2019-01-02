@@ -22,8 +22,8 @@ pub trait Bundler {
 pub struct Darwin<'a> {
     /// Output directory. Defaults to current working directory. 
     pub dir: &'a str,
-    /// Title of the application. 
-    pub title: &'a str,
+    /// Name of the application. 
+    pub name: &'a str,
     /// Url to wrap. 
     pub url: &'a str,
     /// Filepath to icon.
@@ -32,11 +32,11 @@ pub struct Darwin<'a> {
 
 impl Bundler for Darwin<'_> {
     fn bundle(self) -> Result<(), Box<Error>> {
-        let executable = self.title.chars()
+        let executable = self.name.chars()
             .filter(|c| !c.is_whitespace())
             .map(|c| c.to_ascii_lowercase())
             .collect::<String>();
-        let app = PathBuf::from(&self.dir).join(format!("{0}.app", &self.title));
+        let app = PathBuf::from(&self.dir).join(format!("{0}.app", &self.name));
         for dir in ["Contents/MacOS", "Contents/Resources"].iter() {
             fs::create_dir_all(app.join(dir))?;
         }
@@ -55,7 +55,7 @@ impl Bundler for Darwin<'_> {
         fs::File::create(&wrapper)?
             .write_all(h.render_template(BASH_WRAPPER.trim(), &json!({
                 "executable": &executable,
-                "title": &self.title,
+                "title": &self.name,
                 "url": &self.url,
             }))?.as_bytes())?;
         Command::new("chmod")
@@ -73,7 +73,7 @@ impl Bundler for Darwin<'_> {
 // Windows bundles a windows executable. 
 pub struct Windows<'a> {
     pub dir: &'a str,
-    pub title: &'a str,
+    pub name: &'a str,
     pub url: &'a str,
 }
 
@@ -87,23 +87,23 @@ impl Bundler for Windows<'_> {
     fn bundle(self) -> Result<(), Box<Error>> {
         fs::create_dir_all(&self.dir)?;
         let h = Handlebars::new();
-        let bin = PathBuf::from(&self.dir).join(format!("{0}.exe", &self.title));
-        let batch_file = PathBuf::from(&self.dir).join(format!("{0}.bat", self.title));
+        let bin = PathBuf::from(&self.dir).join(format!("{0}.exe", &self.name));
+        let batch_file = PathBuf::from(&self.dir).join(format!("{0}.bat", self.name));
         let sed_file = PathBuf::from(&self.dir).join("tmp.sed");
         fs::copy(env::current_exe()?.to_path_buf(), &bin)?;
         fs::File::create(&batch_file)?
             .write_all(h.render_template(BATCH_WRAPPER.trim(), &json!({
                 "executable": &bin,
-                "title": &self.title,
+                "title": &self.name,
                 "url": &self.url,
             }))?.as_bytes())?;
         fs::File::create(&sed_file)?
             .write_all(h.render_template(SED_FILE.trim(), &json!({
-                "name": &self.title,
-                "executable": &format!("{0}.exe", &self.title),
+                "name": &self.name,
+                "executable": &format!("{0}.exe", &self.name),
                 "entry_point": &batch_file,
                 "source_directory": &self.dir,
-                "target": PathBuf::from(&self.dir).join(format!("target_{0}.exe", &self.title)),
+                "target": PathBuf::from(&self.dir).join(format!("target_{0}.exe", &self.name)),
             }))?.as_bytes())?;
         Command::new("iexpress.exe")
             .arg("/N")
@@ -149,7 +149,7 @@ const PLIST: &str = r#"
 const BASH_WRAPPER: &str = r#"
 #!/usr/bin/env bash
 DIR=$(cd "$(dirname "$0")"; pwd)
-"$DIR/{{executable}}" "{{title}}" "{{url}}"
+"$DIR/{{executable}}" "{{url}}" --name "{{title}}"  inplace
 "#;
 
 /// .sed files are config files for "iexpress", which creates self extracting 
@@ -198,5 +198,5 @@ SourceFiles0={{parent_directory}}
 
 /// Batch script that invokes the generated executable with the given arguments. 
 const BATCH_WRAPPER: &str = r#"
-cmd.exe /c start "{{executable}}" "{{title}}" "{{url}}"
+cmd.exe /c start "{{executable}}" "{{url}}" --name "{{title}}"  inplace
 "#;
