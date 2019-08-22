@@ -9,7 +9,7 @@ use std::{env, error::Error, fs, path::PathBuf, process::Command};
 /// This allows us to be polymorphic across operating systems (macos, windows,
 /// linux) and their various ways of handling an app bundle.
 pub trait Bundler {
-    fn bundle(self) -> Result<(), Box<Error>>;
+    fn bundle(self) -> Result<(), Box<dyn Error>>;
 }
 
 // Darwin bundles a macos app bundle.
@@ -25,7 +25,7 @@ pub struct Darwin<'a> {
 }
 
 impl Bundler for Darwin<'_> {
-    fn bundle(self) -> Result<(), Box<Error>> {
+    fn bundle(self) -> Result<(), Box<dyn Error>> {
         let executable = self
             .name
             .chars()
@@ -86,7 +86,7 @@ pub struct Windows<'a> {
 /// and run.  
 impl Bundler for Windows<'_> {
     /// TODO(jfm): compile icon.
-    fn bundle(self) -> Result<(), Box<Error>> {
+    fn bundle(self) -> Result<(), Box<dyn Error>> {
         fs::create_dir_all(&self.dir)?;
         let h = Handlebars::new();
         let bin = PathBuf::from(&self.dir).join(format!("{0}.exe", &self.name));

@@ -160,11 +160,11 @@ where
 /// Downloader performs network requests.
 /// The default Downloader uses reqwest crate.
 pub trait Downloader {
-    fn get(&self, url: &str) -> Result<Box<Read>>;
+    fn get(&self, url: &str) -> Result<Box<dyn Read>>;
 }
 
 impl Downloader for reqwest::Client {
-    fn get(&self, url: &str) -> Result<Box<Read>> {
+    fn get(&self, url: &str) -> Result<Box<dyn Read>> {
         Ok(Box::new(reqwest::Client::get(self, url).send()?))
     }
 }
