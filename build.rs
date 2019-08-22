@@ -1,9 +1,8 @@
-use image::imageops;
-use std::path::Path;
-use winres;
-
 #[cfg(windows)]
 fn main() {
+    use image::imageops;
+    use std::path::Path;
+    use winres;
     // Check for icon.ico
     // if icon.ico doesnt exist, convert icon.png to icon.ico
     if !Path::new("assets/icon.ico").exists() {
