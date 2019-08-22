@@ -1,13 +1,13 @@
 mod bundle;
-mod infer;
 mod error;
+mod infer;
 
-use web_view::*;
-use clap::{Arg, App, SubCommand};
-use url::Url;
-use pretty_env_logger;
 use crate::bundle::Bundler;
 use crate::infer::{infer_icon, infer_name};
+use clap::{App, Arg, SubCommand};
+use pretty_env_logger;
+use url::Url;
+use web_view::*;
 
 fn main() {
     pretty_env_logger::init();
@@ -15,35 +15,42 @@ fn main() {
         .version("0.2.0")
         .author("Jack Mordaunt <jackmordaunt@gmail.com>")
         .about("Create native apps for your favourite site!")
-        .arg(Arg::with_name("url")
-            .required(true)
-            .takes_value(true)
-            .help("Url of site to nativefy"))
-        .arg(Arg::with_name("name")
-            .takes_value(true)
-            .short("n")
-            .long("name")
-            .help("Name of app"))
-        .arg(Arg::with_name("output")
-            .short("o")
-            .long("output")
-            .takes_value(true)
-            .help("Output directory for generated app, defaults to current directory"))
-        .arg(Arg::with_name("icon-override")
-            .short("i")
-            .long("icon-override")
-            .takes_value(true)
-            .help("Alternative url to scrape the icon from"))
-        .subcommand(SubCommand::with_name("inplace")
-            .about("Open the webview without creating an app"))
+        .arg(
+            Arg::with_name("url")
+                .required(true)
+                .takes_value(true)
+                .help("Url of site to nativefy"),
+        )
+        .arg(
+            Arg::with_name("name")
+                .takes_value(true)
+                .short("n")
+                .long("name")
+                .help("Name of app"),
+        )
+        .arg(
+            Arg::with_name("output")
+                .short("o")
+                .long("output")
+                .takes_value(true)
+                .help("Output directory for generated app, defaults to current directory"),
+        )
+        .arg(
+            Arg::with_name("icon-override")
+                .short("i")
+                .long("icon-override")
+                .takes_value(true)
+                .help("Alternative url to scrape the icon from"),
+        )
+        .subcommand(
+            SubCommand::with_name("inplace").about("Open the webview without creating an app"),
+        )
         .get_matches();
     let url: Url = match matches.value_of("url").unwrap().parse() {
         Ok(url) => url,
-        Err(_) => {
-            format!("https://{}", matches.value_of("url").unwrap())
-                .parse()
-                .expect("malformed URL")
-        },
+        Err(_) => format!("https://{}", matches.value_of("url").unwrap())
+            .parse()
+            .expect("malformed URL"),
     };
     let name: String = match matches.value_of("name") {
         Some(name) => name.into(),
@@ -58,11 +65,11 @@ fn main() {
                 .resizable(true)
                 .debug(true)
                 .user_data(())
-                .invoke_handler(|_wv, _arg| { Ok(()) } )
+                .invoke_handler(|_wv, _arg| Ok(()))
                 .build()
                 .expect("building webview");
             wv.run().expect("running webview");
-        },
+        }
         _ => {
             let dir = matches.value_of("output").unwrap_or("");
             let icon_url: Url = match matches.value_of("icon-override") {
@@ -75,15 +82,19 @@ fn main() {
                     dir: &dir,
                     name: &name,
                     url: &url.into_string(),
-                }.bundle().expect("bundling Windows app");
+                }
+                .bundle()
+                .expect("bundling Windows app");
             } else {
                 bundle::Darwin {
                     dir: &dir,
                     name: &name,
                     url: &url.into_string(),
                     icon: icon,
-                }.bundle().expect("bundling MacOS app");
+                }
+                .bundle()
+                .expect("bundling MacOS app");
             }
-        },
+        }
     };
 }

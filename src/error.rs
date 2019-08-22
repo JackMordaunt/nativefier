@@ -1,23 +1,26 @@
-use std::error::Error as StdError;
 use image;
-use url;
 use reqwest;
+use std::error::Error as StdError;
+use url;
 
 #[derive(Debug)]
 pub enum Error {
-    /// Parsing failures for various primitives. 
+    /// Parsing failures for various primitives.
     Parse(ParseError),
     /// Download and IO errors.  
     /// Wraps a trait object because we don't know what concrete error the
-    /// implementor will use. 
+    /// implementor will use.
     Download(Box<dyn StdError + Sync + Send>),
-    /// Image decoding and processing errors. 
+    /// Image decoding and processing errors.
     Image(image::ImageError),
-    /// Scraping markup for icons. 
+    /// Scraping markup for icons.
     Scrape(String),
-    // InferName captures errors that occur while trying to infer app name from 
-    // a url. 
-    InferName { url: url::Url, reason: String },
+    // InferName captures errors that occur while trying to infer app name from
+    // a url.
+    InferName {
+        url: url::Url,
+        reason: String,
+    },
 }
 
 #[derive(Debug)]
@@ -34,7 +37,7 @@ impl std::fmt::Display for Error {
             Error::Download(err) => write!(f, "downloading: {}", err),
             Error::Image(err) => write!(f, "image: {}", err),
             Error::Scrape(s) => write!(f, "scraping: {}", s),
-            Error::InferName {url, reason} => write!(f, "inferring name for {}: {}", url, reason),
+            Error::InferName { url, reason } => write!(f, "inferring name for {}: {}", url, reason),
         }
     }
 }

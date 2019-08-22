@@ -1,16 +1,16 @@
-use std::convert::*;
-use std::thread;
-use std::sync::mpsc::channel;
-use std::io::{copy, Read};
-use std::cmp::{Ordering, Ord, PartialOrd, PartialEq};
-use std::sync::Arc;
-use std::result::Result as StdResult;
-use scraper::{Html, Selector};
-use image;
-use reqwest;
-use url::Url;
-use log::debug;
 use crate::error::{Error, ParseError};
+use image;
+use log::debug;
+use reqwest;
+use scraper::{Html, Selector};
+use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
+use std::convert::*;
+use std::io::{copy, Read};
+use std::result::Result as StdResult;
+use std::sync::mpsc::channel;
+use std::sync::Arc;
+use std::thread;
+use url::Url;
 
 pub type Result<T> = StdResult<T, Error>;
 
@@ -19,25 +19,27 @@ pub fn infer_icon(url: &Url) -> Result<Icon> {
     Inferer::default().infer(&url.clone().into_string())
 }
 
-/// Infer an application name from a url. 
-/// 
-/// Note: [jiahaog/nativefier](https://github.com/jiahaog/nativefier) infers the 
+/// Infer an application name from a url.
+///
+/// Note: [jiahaog/nativefier](https://github.com/jiahaog/nativefier) infers the
 /// name from the html <title> tag, whereas we just inspect the url's hostname.
-/// 
+///
 /// This is quicker (no io), but doesn't allow for "pretty" titles (with capital
-/// letters, whitespace, etc). 
+/// letters, whitespace, etc).
 pub fn infer_name(url: &Url) -> Result<String> {
     let host = match url.host_str() {
         Some(host) => host,
-        None => return Err(Error::InferName {
-            url: url.clone(),
-            reason: "url does not include hostname".into(),
-        }),
+        None => {
+            return Err(Error::InferName {
+                url: url.clone(),
+                reason: "url does not include hostname".into(),
+            })
+        }
     };
     // If there is two dots eg www.example.com, take the middle part "example"
-    // as the name. 
+    // as the name.
     // If there is one dot eg soundcloud.com, take the first part "soundcloud"
-    // as the name. 
+    // as the name.
     match host.matches(".").count() {
         1 => Ok(host.split(".").nth(0).unwrap().into()),
         2 => Ok(host.split(".").nth(1).unwrap().into()),
@@ -48,13 +50,13 @@ pub fn infer_name(url: &Url) -> Result<String> {
     }
 }
 
-/// Inferer infers the best icon for a given url. 
+/// Inferer infers the best icon for a given url.
 pub struct Inferer<D: Downloader> {
-    /// client downloads the icon data into a buffer. 
+    /// client downloads the icon data into a buffer.
     pub client: D,
 }
 
-/// Default to using reqwest crate to perform network calls. 
+/// Default to using reqwest crate to perform network calls.
 impl Inferer<reqwest::Client> {
     fn default() -> Inferer<reqwest::Client> {
         Inferer {
@@ -64,9 +66,10 @@ impl Inferer<reqwest::Client> {
 }
 
 /// infer the best icon for a url by downloading icon links and comparing for
-/// size, preferring the largest. 
+/// size, preferring the largest.
 impl<D> Inferer<D>
-    where D: Downloader + Clone + Send + Sync + 'static
+where
+    D: Downloader + Clone + Send + Sync + 'static,
 {
     fn infer(&self, url: &str) -> Result<Icon> {
         let (tx, tr) = channel();
@@ -78,7 +81,10 @@ impl<D> Inferer<D>
             workers.push(thread::spawn(move || {
                 let icon = match Icon::download(client.as_ref(), &link) {
                     Ok(icon) => Some(icon),
-                    Err(err) => {debug!("downloading icon: {}", err); None},
+                    Err(err) => {
+                        debug!("downloading icon: {}", err);
+                        None
+                    }
                 };
                 tx.send(icon).expect("sending icon over channel");
             }));
@@ -96,9 +102,9 @@ impl<D> Inferer<D>
         }
     }
     /// Scrape icon links form the html markup at the given url.
-    // FIXME: - Should we return stronger types, like Vec<Url>? 
-    //        - Should the scraping errors simply be ignored? They would only 
-    //          be useful for debugging, not for users, so how to expose for 
+    // FIXME: - Should we return stronger types, like Vec<Url>?
+    //        - Should the scraping errors simply be ignored? They would only
+    //          be useful for debugging, not for users, so how to expose for
     //          debugging?
     fn scrape(&self, url: &str) -> Result<Vec<String>> {
         let mut body = self.client.get(url)?;
@@ -106,8 +112,9 @@ impl<D> Inferer<D>
         body.read_to_string(&mut buf)?;
         let doc = Html::parse_document(&buf);
         let link_el = Selector::parse("link").unwrap();
-        let base = Url::parse(url)?;        
-        let links: Vec<String> = doc.select(&link_el)
+        let base = Url::parse(url)?;
+        let links: Vec<String> = doc
+            .select(&link_el)
             .map(|el| {
                 let el = el.value();
                 let rel = match el.attr("rel") {
@@ -119,41 +126,39 @@ impl<D> Inferer<D>
                     None => return Err(Error::Scrape("no href attribute on link element".into())),
                 };
                 if !rel.contains("icon") {
-                    return Err(Error::Scrape("'rel' attribute does not include 'icon'".into()));
+                    return Err(Error::Scrape(
+                        "'rel' attribute does not include 'icon'".into(),
+                    ));
                 }
                 Ok(href.into())
             })
-            .map(|r: Result<String>| {
-                match r {
-                    Ok(link) => link,
-                    Err(err) => {
-                        debug!("malformed link: {}", err);
-                        "".into()
-                    },
+            .map(|r: Result<String>| match r {
+                Ok(link) => link,
+                Err(err) => {
+                    debug!("malformed link: {}", err);
+                    "".into()
                 }
             })
             .map(|link: String| {
                 if link.contains("http") {
-                   return link; 
+                    return link;
                 }
                 match base.join(&link) {
                     Ok(url) => url.into_string(),
                     Err(err) => {
                         debug!("joining {} to {}: {}", &link, &base, err);
                         "".into()
-                    },
+                    }
                 }
             })
-            .filter(|link: &String| {
-                !link.is_empty()
-            })
+            .filter(|link: &String| !link.is_empty())
             .collect();
         Ok(links)
     }
 }
 
-/// Downloader performs network requests. 
-/// The default Downloader uses reqwest crate. 
+/// Downloader performs network requests.
+/// The default Downloader uses reqwest crate.
 pub trait Downloader {
     fn get(&self, url: &str) -> Result<Box<Read>>;
 }
@@ -164,27 +169,27 @@ impl Downloader for reqwest::Client {
     }
 }
 
-/// Icon is icon detected for a website. 
+/// Icon is icon detected for a website.
 #[derive(Debug)]
 pub struct Icon {
-    /// Uri (typically url) with which this icon was loaded from. 
+    /// Uri (typically url) with which this icon was loaded from.
     pub source: String,
-    /// Name of the icon. May be empty. 
+    /// Name of the icon. May be empty.
     pub name: String,
-    /// Extension for the given image type. 
+    /// Extension for the given image type.
     pub ext: String,
-    /// Container for the image data. 
+    /// Container for the image data.
     pub img: image::RgbaImage,
 }
 
 impl Icon {
-     /// Download the image at href and use it to create an icon. 
+    /// Download the image at href and use it to create an icon.
     fn download(client: &impl Downloader, href: &str) -> Result<Icon> {
         let mut response = client.get(href)?;
         let mut icon_data: Vec<u8> = vec![];
         copy(&mut response, &mut icon_data)?;
         // FIXME: Fails on svg case, since image crate doesn't suppport svg.
-        // TODO: Handle svg. 
+        // TODO: Handle svg.
         let kind = image::guess_format(&icon_data)?;
         let ext = match kind {
             image::PNG => "png",
@@ -192,8 +197,8 @@ impl Icon {
             image::JPEG => "jpeg",
             _ => "",
         };
-        let img = image::load_from_memory(&icon_data)?;  
-        Ok(Icon{
+        let img = image::load_from_memory(&icon_data)?;
+        Ok(Icon {
             source: href.into(),
             name: Url::parse(href)?.host_str().unwrap_or_else(|| "").into(),
             img: img.to_rgba(),
@@ -220,8 +225,7 @@ impl Ord for Icon {
 
 impl PartialEq for Icon {
     fn eq(&self, other: &Icon) -> bool {
-        self.name == other.name &&
-        self.img.dimensions() == other.img.dimensions() 
+        self.name == other.name && self.img.dimensions() == other.img.dimensions()
     }
 }
 
@@ -239,7 +243,7 @@ impl std::str::FromStr for Size {
         if parts.len() < 2 {
             return Err(ParseError::Size(format!("input: {}", s)));
         }
-        Ok(Size{
+        Ok(Size {
             w: parts[0].parse()?,
             h: parts[1].parse()?,
         })
@@ -248,6 +252,6 @@ impl std::str::FromStr for Size {
 
 impl From<(u32, u32)> for Size {
     fn from(d: (u32, u32)) -> Self {
-        Size{w: d.0, h: d.1}
+        Size { w: d.0, h: d.1 }
     }
 }

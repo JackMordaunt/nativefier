@@ -1,30 +1,24 @@
-use std::{
-    env,
-    fs,
-    error::Error,
-    path::PathBuf,
-    process::Command,
-};
-use std::io::{BufWriter, Write};
-use handlebars::Handlebars;
-use serde_json::json;
-use icns;
 use crate::infer;
+use handlebars::Handlebars;
+use icns;
+use serde_json::json;
+use std::io::{BufWriter, Write};
+use std::{env, error::Error, fs, path::PathBuf, process::Command};
 
 /// Bundler is any object that can produce an executable bundle.
 /// This allows us to be polymorphic across operating systems (macos, windows,
-/// linux) and their various ways of handling an app bundle. 
+/// linux) and their various ways of handling an app bundle.
 pub trait Bundler {
     fn bundle(self) -> Result<(), Box<Error>>;
 }
 
-// Darwin bundles a macos app bundle. 
+// Darwin bundles a macos app bundle.
 pub struct Darwin<'a> {
-    /// Output directory. Defaults to current working directory. 
+    /// Output directory. Defaults to current working directory.
     pub dir: &'a str,
-    /// Name of the application. 
+    /// Name of the application.
     pub name: &'a str,
-    /// Url to wrap. 
+    /// Url to wrap.
     pub url: &'a str,
     /// Filepath to icon.
     pub icon: infer::Icon,
@@ -32,7 +26,9 @@ pub struct Darwin<'a> {
 
 impl Bundler for Darwin<'_> {
     fn bundle(self) -> Result<(), Box<Error>> {
-        let executable = self.name.chars()
+        let executable = self
+            .name
+            .chars()
             .filter(|c| !c.is_whitespace())
             .map(|c| c.to_ascii_lowercase())
             .collect::<String>();
@@ -46,44 +42,50 @@ impl Bundler for Darwin<'_> {
         )?;
         let h = Handlebars::new();
         let plist = app.join("Contents/Info.plist");
-        fs::File::create(&plist)?
-            .write_all(h.render_template(PLIST.trim(), &json!({
-                "executable": &executable,
-                "url": &self.url,
-            }))?.as_bytes())?;
+        fs::File::create(&plist)?.write_all(
+            h.render_template(
+                PLIST.trim(),
+                &json!({
+                    "executable": &executable,
+                    "url": &self.url,
+                }),
+            )?
+            .as_bytes(),
+        )?;
         let wrapper = app.join(format!("Contents/MacOS/{0}.sh", &executable));
-        fs::File::create(&wrapper)?
-            .write_all(h.render_template(BASH_WRAPPER.trim(), &json!({
-                "executable": &executable,
-                "title": &self.name,
-                "url": &self.url,
-            }))?.as_bytes())?;
-        Command::new("chmod")
-            .arg("+x")
-            .arg(&wrapper)
-            .output()?;
+        fs::File::create(&wrapper)?.write_all(
+            h.render_template(
+                BASH_WRAPPER.trim(),
+                &json!({
+                    "executable": &executable,
+                    "title": &self.name,
+                    "url": &self.url,
+                }),
+            )?
+            .as_bytes(),
+        )?;
+        Command::new("chmod").arg("+x").arg(&wrapper).output()?;
         let icon_path = app.join("Contents/Resources/icon.icns");
         let icon_file = fs::File::create(&icon_path)?;
-        icns::Encoder::new(BufWriter::new(icon_file))
-            .encode(&self.icon.img)?;
+        icns::Encoder::new(BufWriter::new(icon_file)).encode(&self.icon.img)?;
         Ok(())
     }
 }
 
-// Windows bundles a windows executable. 
+// Windows bundles a windows executable.
 pub struct Windows<'a> {
     pub dir: &'a str,
     pub name: &'a str,
     pub url: &'a str,
 }
 
-/// Bundle nativefier executable using "iexpress", which is a Windows 
+/// Bundle nativefier executable using "iexpress", which is a Windows
 /// program that creates self extracting installers.
 /// In order to capture post-compilation information (ie, our arguments:
 /// title and url) we embed it into a batch script that is then self extracted
 /// and run.  
 impl Bundler for Windows<'_> {
-    /// TODO(jfm): compile icon. 
+    /// TODO(jfm): compile icon.
     fn bundle(self) -> Result<(), Box<Error>> {
         fs::create_dir_all(&self.dir)?;
         let h = Handlebars::new();
@@ -91,20 +93,30 @@ impl Bundler for Windows<'_> {
         let batch_file = PathBuf::from(&self.dir).join(format!("{0}.bat", self.name));
         let sed_file = PathBuf::from(&self.dir).join("tmp.sed");
         fs::copy(env::current_exe()?.to_path_buf(), &bin)?;
-        fs::File::create(&batch_file)?
-            .write_all(h.render_template(BATCH_WRAPPER.trim(), &json!({
-                "executable": &bin,
-                "title": &self.name,
-                "url": &self.url,
-            }))?.as_bytes())?;
-        fs::File::create(&sed_file)?
-            .write_all(h.render_template(SED_FILE.trim(), &json!({
-                "name": &self.name,
-                "executable": &format!("{0}.exe", &self.name),
-                "entry_point": &batch_file,
-                "source_directory": &self.dir,
-                "target": PathBuf::from(&self.dir).join(format!("target_{0}.exe", &self.name)),
-            }))?.as_bytes())?;
+        fs::File::create(&batch_file)?.write_all(
+            h.render_template(
+                BATCH_WRAPPER.trim(),
+                &json!({
+                    "executable": &bin,
+                    "title": &self.name,
+                    "url": &self.url,
+                }),
+            )?
+            .as_bytes(),
+        )?;
+        fs::File::create(&sed_file)?.write_all(
+            h.render_template(
+                SED_FILE.trim(),
+                &json!({
+                    "name": &self.name,
+                    "executable": &format!("{0}.exe", &self.name),
+                    "entry_point": &batch_file,
+                    "source_directory": &self.dir,
+                    "target": PathBuf::from(&self.dir).join(format!("target_{0}.exe", &self.name)),
+                }),
+            )?
+            .as_bytes(),
+        )?;
         Command::new("iexpress.exe")
             .arg("/N")
             .arg("/Q")
@@ -114,7 +126,7 @@ impl Bundler for Windows<'_> {
     }
 }
 
-/// .plist files are config files which MacOS .app bundles use. 
+/// .plist files are config files which MacOS .app bundles use.
 const PLIST: &str = r#"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -152,7 +164,7 @@ DIR=$(cd "$(dirname "$0")"; pwd)
 "$DIR/{{executable}}" "{{url}}" --name "{{title}}"  inplace
 "#;
 
-/// .sed files are config files for "iexpress", which creates self extracting 
+/// .sed files are config files for "iexpress", which creates self extracting
 /// installers.
 const SED_FILE: &str = r#"
 [Version]
@@ -196,7 +208,7 @@ SourceFiles0={{parent_directory}}
 %FILE1%=
 "#;
 
-/// Batch script that invokes the generated executable with the given arguments. 
+/// Batch script that invokes the generated executable with the given arguments.
 const BATCH_WRAPPER: &str = r#"
 cmd.exe /c start "{{executable}}" "{{url}}" --name "{{title}}"  inplace
 "#;
