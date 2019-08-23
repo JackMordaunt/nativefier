@@ -15,6 +15,15 @@ Inspired by [jiahaog/nativefier](https://github.com/jiahaog/nativefier).
 
 - Compatibility with websites is dependent on the built-in webview for the OS  
 
+## Building
+
+This project uses `cargo-make` to compress with `upx` and copy to `.cargo/bin` directory. See `Makefile.toml`.
+
+Standard: `cargo make install`  
+Compressed: `cargo make install-tiny`  
+
+A simple `cargo build` works just fine as well.
+
 ## Key Components
 
 - [x] Delineate between execution modes (bundle vs bundler).
