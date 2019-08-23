@@ -2,76 +2,23 @@
 command = "cargo"
 args = ["build", "--release"]
 
-
 [tasks.compress]
 command = "upx"
 args = ["target/release/nativefier"]
-dependencies = ["prepare-upx"]
-
-# Using a rust script so I don't have to mess around with various shell syntax.
-# Since I'm not on Windows to test batch/cmd/powershell, thus I'm more confident
-# this will work "out of the box". 
-[tasks.prepare-upx]
-script_runner = "@rust"
-script = [
-'''
-//! ```cargo
-//! [package]
-//! edition = "2018"
-//!
-//! [dependencies]
-//! os_info = "1.1.0"
-//! ```
-use std::process::{exit, Command};
-use os_info;
-fn main() {
-       match Command::new("upx").output() {
-            Ok(_) => {},
-            Err(_) => {
-                match os_info::get().os_type() {
-                    os_info::Type::Windows => {
-                        let install = Command::new("scoop")
-                            .arg("install")
-                            .arg("upx")
-                            .output();
-                        match install {
-                            Ok(_) => {},
-                            Err(_) => {
-                                print!("Script requires scoop to install upx. \nInstall scoop with \"iex (new-object net.webclient).downloadstring('https://get.scoop.sh')\"\n");
-                                exit(1);
-                            },
-                        };
-                    },
-                    os_info::Type::Macos => {
-                        let install = Command::new("brew")
-                            .arg("install")
-                            .arg("upx")
-                            .output();
-                        match install {
-                            Ok(_) => {},
-                            Err(_) => {
-                                print!("Script requires Homebrew to install upx. \nInstall Homebrew with \"/usr/bin/ruby -e \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)\"\"\n");
-                                exit(1);
-                            },
-                        };
-                    },
-                    _ => {
-                        println!("OS not supported. Please install upx manually.");
-                        exit(1);
-                    },
-                };
-            },
-        };
-}
-'''
-]
 
 [tasks.copy]
+script_runner = "@shell"
 script = [
-    "cp -f -v target/release/nativefier ~/.cargo/bin/nativefier"
+    "cp -f -v target/release/nativefier $HOME/.cargo/bin/nativefier"
 ]
 
 [tasks.install]
+dependencies = [
+    "build",
+    "copy",
+]
+
+[tasks.install-tiny]
 dependencies = [
     "build",
     "compress",
