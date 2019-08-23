@@ -15,14 +15,11 @@ Inspired by [jiahaog/nativefier](https://github.com/jiahaog/nativefier).
 
 - Compatibility with websites is dependent on the built-in webview for the OS  
 
-## Building
+## Structure
 
-This project uses `cargo-make` to compress with `upx` and copy to `.cargo/bin` directory. See `Makefile.toml`.
-
-Standard: `cargo make install`  
-Compressed: `cargo make install-tiny`  
-
-A simple `cargo build` works just fine as well.
+- `gui` contains the frontend code which is compiled to `wasm`.
+- `webview` serves the `gui`, connecting it to `nativefier` core and the OS.
+- `nativefier` is the core logic that produces the bundle.
 
 ## Key Components
 
