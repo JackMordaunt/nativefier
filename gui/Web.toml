@@ -1,4 +1,0 @@
-default-target = "wasm32-unknown-unknown"
-
-[target.emscripten]
-link-args = ["-s", "LEGACY_VM_SUPPORT=1", "-s", "DEMANGLE_SUPPORT=1", "-s"]

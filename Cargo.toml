@@ -1,6 +1,40 @@
-[workspace]
+[package]
+name = "nativefier"
+version = "0.2.0"
+authors = ["Jack Mordaunt <jackmordaunt@gmail.com>"]
+edition = "2018"
+build = "build.rs"
 
-members = [
-    "nativefier",
-    "gui",
-]
+[[bin]]
+name = "cli"
+path = "src/cli.rs"
+
+[[bin]]
+name = "ui"
+path = "src/ui.rs"
+
+[dependencies]
+web-view = "0.4.1"
+handlebars = "2.0.1"
+clap = "2.33.0"
+serde_json = "1.0.40"
+reqwest = "0.9.20"
+scraper = "0.10.1"
+url = "2.1.0"
+hyper = "0.12.33"
+image = "0.22.1"
+log = "0.4.8"
+pretty_env_logger = "0.3.1"
+serde = "1.0.99"
+
+[dependencies.icns]
+git = "https://github.com/JackMordaunt/icns-rs.git"
+branch = "master"
+
+# Required for DPI scaling on windows. Sigh.
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3.8", features = ["shellscalingapi"] }
+
+[build-dependencies]
+winres = "0.1.11"
+image = "0.22.1"
