@@ -2,7 +2,7 @@
 fn main() {
     use image::imageops;
     use std::path::Path;
-    use winres;
+    use winres::WindowsResource;
     // Check for icon.ico
     // if icon.ico doesnt exist, convert icon.png to icon.ico
     if !Path::new("assets/icon.ico").exists() {
@@ -12,7 +12,7 @@ fn main() {
             resized.save("assets/icon.ico").unwrap();
         }
     }
-    let mut res = winres::WindowsResource::new();
+    let mut res = WindowsResource::new();
     res.set_icon("assets/icon.ico");
     res.compile().expect("compiling winres");
 }

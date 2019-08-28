@@ -684,13 +684,13 @@ dependencies = [
 [[package]]
 name = "icns"
 version = "0.1.1"
-source = "git+https://github.com/JackMordaunt/icns-rs.git#ae24a87564d06c2847d6c110faf153a672cabf40"
+source = "git+https://github.com/JackMordaunt/icns-rs.git#e43058bdcbef3614f6c92c71a68b8d0d578e6d69"
 dependencies = [
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "deflate 0.7.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "image 0.22.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "png 0.13.2 (git+https://github.com/JackMordaunt/image-png.git?branch=deflate/specify-compression)",
+ "png 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1166,17 +1166,6 @@ dependencies = [
 name = "pkg-config"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "png"
-version = "0.13.2"
-source = "git+https://github.com/JackMordaunt/image-png.git?branch=deflate/specify-compression#477679295b20a6a7d6e9713b8e8efd720643ca79"
-dependencies = [
- "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "deflate 0.7.20 (registry+https://github.com/rust-lang/crates.io-index)",
- "inflate 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "num-iter 0.1.39 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "png"
@@ -2227,13 +2216,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "webview"
-version = "0.1.0"
-dependencies = [
- "web-view 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "webview-sys"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2482,7 +2464,6 @@ dependencies = [
 "checksum phf_generator 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)" = "09364cc93c159b8b06b1f4dd8a4398984503483891b0c26b867cf431fb132662"
 "checksum phf_shared 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)" = "234f71a15de2288bcb7e3b6515828d22af7ec8598ee6d24c3b526fa0a80b67a0"
 "checksum pkg-config 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "a7c1d2cfa5a714db3b5f24f0915e74fcdf91d09d496ba61329705dda7774d2af"
-"checksum png 0.13.2 (git+https://github.com/JackMordaunt/image-png.git?branch=deflate/specify-compression)" = "<none>"
 "checksum png 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8422b27bb2c013dd97b9aef69e161ce262236f49aaf46a0489011c8ff0264602"
 "checksum ppv-lite86 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "e3cbf9f658cdb5000fcf6f362b8ea2ba154b9f146a61c7a20d647034c6b6561b"
 "checksum precomputed-hash 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"

@@ -3,5 +3,4 @@
 members = [
     "nativefier",
     "gui",
-    "webview",
 ]

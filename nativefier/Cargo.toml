@@ -5,6 +5,14 @@ authors = ["Jack Mordaunt <jackmordaunt@gmail.com>"]
 edition = "2018"
 build = "build.rs"
 
+[[bin]]
+name = "cli"
+path = "src/cli.rs"
+
+[[bin]]
+name = "ui"
+path = "src/ui.rs"
+
 [dependencies]
 web-view = "0.4.1"
 handlebars = "2.0.1"

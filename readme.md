@@ -35,3 +35,9 @@ Inspired by [jiahaog/nativefier](https://github.com/jiahaog/nativefier).
 - [ ] Integrate with chrome via the Chrome DevTools Protocol.
 - [ ] Integrate with this [icon repository](https://github.com/jiahaog/nativefier-icons).  
 - [ ] Inject JS/CSS for customisable experience.  
+
+## ie11 GUI with asmjs-unknown-emscripten
+
+- Needs polyfil for Math.random()
+- It seems like my prepended js "runtime.js" is NOT being prepended/activated 
+- ?? 
