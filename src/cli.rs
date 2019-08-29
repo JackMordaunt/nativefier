@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 mod bundle;
 mod error;
 mod infer;

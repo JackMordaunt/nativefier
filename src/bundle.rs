@@ -33,6 +33,7 @@ impl Bundler for Darwin<'_> {
         let app = PathBuf::from(&self.dir).join(format!("{0}.app", &self.name));
         let plist = app.join("Contents/Info.plist");
         let wrapper = app.join(format!("Contents/MacOS/{0}.sh", &executable));
+        let icon_path = app.join("Contents/Resources/icon.icns");
         for dir in ["Contents/MacOS", "Contents/Resources"].iter() {
             fs::create_dir_all(app.join(dir))?;
         }
@@ -45,7 +46,7 @@ impl Bundler for Darwin<'_> {
         )?;
         fs::File::create(&wrapper)?.write_all(
             format!(
-                include_str!("../res/shell_wrapper.sh"),
+                include_str!("../res/launch.sh"),
                 executable = &executable,
                 title = &self.name,
                 url = &self.url,
@@ -53,9 +54,7 @@ impl Bundler for Darwin<'_> {
             .as_bytes(),
         )?;
         Command::new("chmod").arg("+x").arg(&wrapper).output()?;
-        let icon_path = app.join("Contents/Resources/icon.icns");
-        let icon_file = fs::File::create(&icon_path)?;
-        icns::Encoder::new(BufWriter::new(icon_file)).encode(&self.icon.img)?;
+        icns::Encoder::new(BufWriter::new(fs::File::create(&icon_path)?)).encode(&self.icon.img)?;
         Ok(())
     }
 }
@@ -67,14 +66,41 @@ pub struct Windows<'a> {
     pub url: &'a str,
 }
 
-/// Bundle nativefier executable using "iexpress", which is a Windows
-/// program that creates self extracting installers.
-/// In order to capture post-compilation information (ie, our arguments:
-/// title and url) we embed it into a batch script that is then self extracted
-/// and run.  
+/// Bundler uses an executable "warp-packer" to create a standalone binary.
 impl Bundler for Windows<'_> {
     /// TODO(jfm): compile icon.
     fn bundle(self) -> Result<(), Box<dyn Error>> {
+        let root = PathBuf::from(&self.dir);
+        let bundle = root.join(format!("{}.exe", &self.name));
+        let packer = root.join("warp-packer.exe");
+        let input = PathBuf::from(&self.dir).join(&self.name);
+        let exec = input.join(format!("{}.exe", &self.name));
+        let launcher = input.join("launch.bat");
+        fs::create_dir_all(&input)?;
+        fs::copy(env::current_exe()?.to_path_buf(), &exec)?;
+        fs::File::create(&launcher)?.write_all(
+            format!(
+                include_str!("../res/launch.bat"),
+                name = &self.name,
+                executable = format!("{}.exe", &self.name),
+                url = &self.url,
+            )
+            .as_bytes(),
+        )?;
+        fs::File::create(&packer)?.write_all(include_bytes!("../res/warp-packer.exe"))?;
+        Command::new("warp-packer.exe")
+            .arg("--arch")
+            .arg("windows-x64")
+            .arg("--input_dir")
+            .arg(input.to_string_lossy().as_ref())
+            .arg("--exec")
+            .arg("launch.bat")
+            .arg("--output")
+            .arg(bundle.to_string_lossy().as_ref())
+            .output()?;
+        // Cleanup.
+        fs::remove_dir_all(&input).map(|err| format!("removing input directory: {:?}", err))?;
+        fs::remove_file(&packer).map(|err| format!("removing packer: {:?}", err))?;
         Ok(())
     }
 }
