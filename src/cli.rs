@@ -11,6 +11,7 @@ use url::Url;
 use web_view::*;
 
 fn main() {
+    set_dpi_aware();
     pretty_env_logger::init();
     let matches = App::new("nativefier")
         .version("0.2.0")
@@ -99,3 +100,12 @@ fn main() {
         }
     };
 }
+
+#[cfg(target_os = "windows")]
+fn set_dpi_aware() {
+    use winapi::um::shellscalingapi::{SetProcessDpiAwareness, PROCESS_SYSTEM_DPI_AWARE};
+    unsafe { SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE) };
+}
+
+#[cfg(not(target_os = "windows"))]
+fn set_dpi_aware() {}
