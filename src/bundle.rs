@@ -210,5 +210,5 @@ SourceFiles0={{parent_directory}}
 
 /// Batch script that invokes the generated executable with the given arguments.
 const BATCH_WRAPPER: &str = r#"
-cmd.exe /c start "{{executable}}" "{{url}}" --name "{{title}}"  inplace
+cmd.exe /c start "title" "{{executable}}" "{{url}}" --name "{{title}}"  inplace
 "#;
