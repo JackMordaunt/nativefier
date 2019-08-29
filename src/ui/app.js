@@ -16,7 +16,6 @@ var Action = (function () {
             send({ type: "LoadConfig" });
         },
         build_app: function (name, url, directory) {
-            console.log({ type: "Build", name, url, directory });
             send({ type: "Build", name, url, directory });
         },
         choose_directory: function () {
@@ -62,7 +61,7 @@ var Gui = (function () {
 
             $("#build").on("click", function (e) {
                 e.preventDefault();
-                Action.build_app($("#name").text(), $("#url").text(), $("#directory").path || "");
+                Action.build_app($("#name").val(), $("#url").val(), $("#directory").data().path);
             })
 
             Action.load_config();
@@ -86,10 +85,10 @@ var Gui = (function () {
                 button.append($("<span> > </span>"));
             });
             button.append(end);
-            button.path = path;
+            button.data({ path });
         },
         build_complete: function () {
-            $("#build-status").append($("done"));
+            $("#build-status").append("<span>done</span>");
         },
     }
 })();
