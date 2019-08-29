@@ -108,11 +108,13 @@ fn set_dpi_aware() {
 fn set_dpi_aware() {}
 
 fn build(name: String, url: String, directory: String) -> Result<(), Box<dyn ::std::error::Error>> {
+    let icon = infer_icon(&url.parse()?).map_err(|err| format!("inferring icon: {}", err))?;
     if cfg!(windows) {
         bundle::Windows {
             dir: &directory,
             name: &name,
             url: &url,
+            icon: icon,
         }
         .bundle()
         .map_err(|err| format!("bundling Windows app: {}", err).into())
@@ -121,7 +123,7 @@ fn build(name: String, url: String, directory: String) -> Result<(), Box<dyn ::s
             dir: &directory,
             name: &name,
             url: &url,
-            icon: infer_icon(&url.parse()?).map_err(|err| format!("inferring icon: {}", err))?,
+            icon: icon,
         }
         .bundle()
         .map_err(|err| format!("bundling MacOS app: {}", err).into())

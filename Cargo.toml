@@ -31,10 +31,10 @@ dirs = "2.0.2"
 git = "https://github.com/JackMordaunt/icns-rs.git"
 branch = "master"
 
-# Required for DPI scaling on windows. Sigh.
 [target.'cfg(windows)'.dependencies]
+# Required for DPI scaling on windows. Sigh.
 winapi = { version = "0.3.8", features = ["shellscalingapi"] }
 
-[build-dependencies]
+[target.'cfg(windows)'.build-dependencies]
 winres = "0.1.11"
 image = "0.22.1"

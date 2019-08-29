@@ -84,6 +84,7 @@ fn main() {
                     dir: &dir,
                     name: &name,
                     url: &url.into_string(),
+                    icon: icon,
                 }
                 .bundle()
                 .expect("bundling Windows app");

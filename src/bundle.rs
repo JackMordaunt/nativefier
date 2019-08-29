@@ -64,19 +64,27 @@ pub struct Windows<'a> {
     pub dir: &'a str,
     pub name: &'a str,
     pub url: &'a str,
+    pub icon: infer::Icon,
 }
 
-/// Bundler uses an executable "warp-packer" to create a standalone binary.
+/// Bundler uses an executable "warp-packer" to create a standalone binary,
+/// and "ResourceHacker" to write the icon to final binary.
+/// Yeah, it's pretty hacky and bloaty. Still smaller than electron ;)
+///  
+/// Todo: remove dependency on warp-packer and ResourceHacker.
 impl Bundler for Windows<'_> {
-    /// TODO(jfm): compile icon.
     #[cfg(target_os = "windows")]
     fn bundle(self) -> Result<(), Box<dyn Error>> {
+        use image::imageops::{resize, Lanczos3};
         let root = PathBuf::from(&self.dir);
-        let bundle = root.join(format!("{}.exe", &self.name));
-        let packer = root.join("warp-packer.exe");
-        let input = PathBuf::from(&self.dir).join(&self.name);
+        let workspace = root.join("tmp");
+        let bundle = workspace.join(format!("{}.exe", &self.name));
+        let packer = workspace.join("warp-packer.exe");
+        let input = workspace.join(&self.name);
         let exec = input.join(format!("{}.exe", &self.name));
         let launcher = input.join("launch.bat");
+        let icon = workspace.join("icon.ico");
+        let rcedit = workspace.join("rcedit.exe");
         fs::create_dir_all(&input)?;
         fs::copy(env::current_exe()?.to_path_buf(), &exec)?;
         fs::File::create(&launcher)?.write_all(
@@ -89,7 +97,7 @@ impl Bundler for Windows<'_> {
             .as_bytes(),
         )?;
         fs::File::create(&packer)?.write_all(include_bytes!("../res/warp-packer.exe"))?;
-        Command::new("warp-packer.exe")
+        Command::new(&packer.to_string_lossy().as_ref())
             .arg("--arch")
             .arg("windows-x64")
             .arg("--input_dir")
@@ -99,9 +107,23 @@ impl Bundler for Windows<'_> {
             .arg("--output")
             .arg(bundle.to_string_lossy().as_ref())
             .output()?;
+        resize(&self.icon.img, 255, 255, Lanczos3).save(&icon)?;
+        fs::File::create(&rcedit)?.write_all(include_bytes!("../res/rcedit.exe"))?;
+        Command::new(&rcedit.to_string_lossy().as_ref())
+            .arg("-open")
+            .arg(&bundle.to_string_lossy().as_ref())
+            .arg("-save")
+            .arg(&bundle.to_string_lossy().as_ref())
+            .arg("-action")
+            .arg("addoverwrite")
+            .arg("-res")
+            .arg(&icon.to_string_lossy().as_ref())
+            .arg("-mask")
+            .arg("ICONGROUP,1,1033")
+            .output()?;
         // Cleanup.
-        fs::remove_dir_all(&input).map(|err| format!("removing input directory: {:?}", err))?;
-        fs::remove_file(&packer).map(|err| format!("removing packer: {:?}", err))?;
+        fs::rename(&bundle, root.join(format!("{}.exe", &self.name)))?;
+        fs::remove_dir_all(&workspace).map(|err| format!("removing temporary files: {:?}", err))?;
         Ok(())
     }
 
