@@ -1,3 +1,7 @@
+var Config = {
+    platform: null,
+};
+
 // Actions which get sent to the backend.
 var Action = (function () {
     "use strict";
@@ -7,7 +11,11 @@ var Action = (function () {
     }
 
     return {
+        load_config: function () {
+            send({ type: "LoadConfig" });
+        },
         build_app: function (name, url, directory) {
+            console.log({ type: "Build", name, url, directory });
             send({ type: "Build", name, url, directory });
         },
         choose_directory: function () {
@@ -21,10 +29,16 @@ var Event = (function () {
     "use strict";
 
     return {
-        dispatch: function (msg) {
-            switch (msg.type) {
+        dispatch: function (event) {
+            switch (event.type) {
+                case "ConfigLoaded":
+                    Config = event;
+                    break;
                 case "DirectoryChosen":
-                    Gui.set_directory(msg.path);
+                    Gui.set_directory(event.path);
+                    break;
+                case "BuildComplete":
+                    Gui.build_complete();
                     break;
             }
         }
@@ -44,13 +58,21 @@ var Gui = (function () {
                 Action.choose_directory();
             });
 
-            $("#build-test").on("click", function (e) {
+            $("#build").on("click", function (e) {
                 e.preventDefault();
-                Action.build_app("SoundCloud", "https://soundcloud.com/app", "C:\\Users\\Jack\\Desktop");
+                Action.build_app($("#name").text(), $("#url").text(), $("#directory").path || "");
             })
+
+            Action.load_config();
         },
         set_directory: function (path) {
-            var bits = folder.split(/:\\|\\/).map(function (x) {
+            var pattern;
+            if (Config.platform == "windows") {
+                pattern = /:\\|\\/;
+            } else {
+                pattern = "/";
+            }
+            var bits = path.split(pattern).map(function (x) {
                 return document.createTextNode(x);
             });
             var end = bits.pop();
@@ -59,9 +81,15 @@ var Gui = (function () {
             button.empty();
             bits.forEach(function (bit) {
                 button.append(bit);
-                button.append($("<span>❱</span>"));
+                button.append($("<span> > </span>"));
             });
             button.append(end);
+            button.path = path;
+        },
+        build_complete: function () {
+            $("#build-status").append($("done"));
         },
     }
 })();
+
+$(document).ready(Gui.boot);

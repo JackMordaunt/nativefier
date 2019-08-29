@@ -2,14 +2,14 @@ mod bundle;
 mod error;
 mod infer;
 
-// use base64;
 use bundle::Bundler;
+use dirs;
 use infer::infer_icon;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::error::Error;
 use std::path::PathBuf;
-use web_view::{Content, WebView};
+use web_view::{Content, WVResult, WebView};
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
@@ -19,26 +19,25 @@ enum Action {
         url: String,
         directory: String,
     },
-    // Required since the web has no way to allowing user to select a directory.
-    // Therefore, we need to implement our own dialogue.
     ChooseDirectory,
+    LoadConfig,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 enum Event {
     DirectoryChosen { path: PathBuf },
+    ConfigLoaded { platform: String },
+    BuildComplete,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    if cfg!(windows) {
-        set_dpi_aware();
-    }
+    set_dpi_aware();
     let html = format!(
         include_str!("ui/index.html"),
         style = format!("<style>{}</style>", include_str!("ui/style.css")),
         cash = format!("<script>{}</script>", include_str!("ui/cash.min.js")),
-        app = format!("<script>{}</script>", include_str!("ui/app.js")),
+        app = format!("<script>{}</script>", include_str!("ui/app.js"),),
     );
     let wv = web_view::builder()
         .title("nativefier")
@@ -46,14 +45,33 @@ fn main() -> Result<(), Box<dyn Error>> {
         .size(400, 300)
         .content(Content::Html(html))
         .user_data(())
-        .invoke_handler(move |mut _wv: &mut WebView<()>, arg: &str| {
+        .invoke_handler(move |wv: &mut WebView<()>, arg: &str| {
             match serde_json::from_str::<Action>(arg) {
+                Ok(Action::LoadConfig) => {
+                    dispatch(
+                        wv,
+                        &Event::ConfigLoaded {
+                            platform: if cfg!(windows) { "windows" } else { "unix" }.into(),
+                        },
+                    )
+                    .ok();
+                }
                 Ok(Action::Build {
                     name,
                     url,
                     directory,
                 }) => {
                     build(name, url, directory).expect("building app");
+                    dispatch(wv, &Event::BuildComplete).ok();
+                }
+                Ok(Action::ChooseDirectory) => {
+                    let default = dirs::desktop_dir().expect("getting desktop directory");
+                    let path = wv
+                        .dialog()
+                        .choose_directory("Choose output directory", &default)
+                        .expect("selecting output directory")
+                        .unwrap_or(default);
+                    dispatch(wv, &Event::DirectoryChosen { path }).ok();
                 }
                 _ => {}
             };
@@ -64,11 +82,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn dispatch(wv: &mut WebView<()>, event: &Event) -> WVResult {
+    let js = format!(
+        "Event.dispatch(JSON.parse({}))",
+        serde_json::to_string(event)
+            .and_then(|s| serde_json::to_string(&s))
+            .expect("serializing event"),
+    );
+    wv.eval(&js)
+}
+
 #[cfg(target_os = "windows")]
 fn set_dpi_aware() {
     use winapi::um::shellscalingapi::{SetProcessDpiAwareness, PROCESS_SYSTEM_DPI_AWARE};
     unsafe { SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE) };
 }
+
+fn set_dpi_aware() {}
 
 fn build(name: String, url: String, directory: String) -> Result<(), Box<dyn ::std::error::Error>> {
     if cfg!(windows) {
