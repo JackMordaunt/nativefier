@@ -8,13 +8,15 @@ fn main() {
     if !Path::new("res/icon.ico").exists() {
         if Path::new("res/icon.png").exists() {
             let src = image::open("res/icon.png").unwrap();
-            let resized = imageops::resize(&src, 255, 255, imageops::Lanczos3);
-            resized.save("res/icon.ico").unwrap();
+            imageops::resize(&src, 255, 255, imageops::Lanczos3)
+                .save("res/icon.ico")
+                .expect("saving icon file");
         }
     }
-    let mut res = WindowsResource::new();
-    res.set_icon("res/icon.ico");
-    res.compile().expect("compiling winres");
+    WindowsResource::new()
+        .set_icon("res/icon.ico")
+        .compile()
+        .expect("compiling winres");
 }
 
 #[cfg(unix)]
