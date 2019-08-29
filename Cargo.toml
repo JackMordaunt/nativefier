@@ -15,7 +15,6 @@ path = "src/ui.rs"
 
 [dependencies]
 web-view = "0.4.1"
-handlebars = "2.0.1"
 clap = "2.33.0"
 serde_json = "1.0.40"
 reqwest = "0.9.20"
