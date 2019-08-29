@@ -104,6 +104,7 @@ fn set_dpi_aware() {
     unsafe { SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE) };
 }
 
+#[cfg(not(target_os = "windows"))]
 fn set_dpi_aware() {}
 
 fn build(name: String, url: String, directory: String) -> Result<(), Box<dyn ::std::error::Error>> {
