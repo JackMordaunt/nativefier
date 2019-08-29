@@ -41,15 +41,11 @@ impl Bundler for Darwin<'_> {
             app.join(format!("Contents/MacOS/{0}", &executable)),
         )?;
         fs::File::create(&plist)?.write_all(
-            format!(
-                include_str!("../templates/Info.plist"),
-                executable = &executable,
-            )
-            .as_bytes(),
+            format!(include_str!("../res/Info.plist"), executable = &executable,).as_bytes(),
         )?;
         fs::File::create(&wrapper)?.write_all(
             format!(
-                include_str!("../templates/shell_wrapper.sh"),
+                include_str!("../res/shell_wrapper.sh"),
                 executable = &executable,
                 title = &self.name,
                 url = &self.url,
