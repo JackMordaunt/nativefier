@@ -69,6 +69,7 @@ pub struct Windows<'a> {
 /// Bundler uses an executable "warp-packer" to create a standalone binary.
 impl Bundler for Windows<'_> {
     /// TODO(jfm): compile icon.
+    #[cfg(target_os = "windows")]
     fn bundle(self) -> Result<(), Box<dyn Error>> {
         let root = PathBuf::from(&self.dir);
         let bundle = root.join(format!("{}.exe", &self.name));
@@ -102,5 +103,10 @@ impl Bundler for Windows<'_> {
         fs::remove_dir_all(&input).map(|err| format!("removing input directory: {:?}", err))?;
         fs::remove_file(&packer).map(|err| format!("removing packer: {:?}", err))?;
         Ok(())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn bundle(self) -> Result<(), Box<dyn Error>> {
+        Err("cannot bundle windows application on this OS".into())
     }
 }
