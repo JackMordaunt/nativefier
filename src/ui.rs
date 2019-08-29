@@ -11,7 +11,7 @@ use std::error::Error;
 use std::path::PathBuf;
 use web_view::{Content, WVResult, WebView};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type")]
 enum Action {
     Build {
@@ -23,7 +23,7 @@ enum Action {
     LoadConfig,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type")]
 enum Event {
     DirectoryChosen {
@@ -52,7 +52,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .content(Content::Html(html))
         .user_data(())
         .invoke_handler(move |wv: &mut WebView<()>, arg: &str| {
-            match serde_json::from_str::<Action>(arg) {
+            let action = serde_json::from_str::<Action>(arg);
+            println!("{:?}", action);
+            match action {
                 Ok(Action::LoadConfig) => {
                     dispatch(
                         wv,
@@ -90,10 +92,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn dispatch(wv: &mut WebView<()>, event: &Event) -> WVResult {
     let js = format!(
-        "Event.dispatch(JSON.parse({}))",
-        serde_json::to_string(event)
-            .and_then(|s| serde_json::to_string(&s))
-            .expect("serializing event"),
+        "Event.dispatch({})",
+        serde_json::to_string(event).expect("serializing event"),
     );
     wv.eval(&js)
 }
