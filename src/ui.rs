@@ -26,8 +26,13 @@ enum Action {
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 enum Event {
-    DirectoryChosen { path: PathBuf },
-    ConfigLoaded { platform: String },
+    DirectoryChosen {
+        path: PathBuf,
+    },
+    ConfigLoaded {
+        platform: String,
+        default_path: PathBuf,
+    },
     BuildComplete,
 }
 
@@ -39,6 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         cash = format!("<script>{}</script>", include_str!("ui/cash.min.js")),
         app = format!("<script>{}</script>", include_str!("ui/app.js"),),
     );
+    let default_path = dirs::desktop_dir().expect("loading desktop directory");
     let wv = web_view::builder()
         .title("nativefier")
         .resizable(true)
@@ -52,6 +58,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         wv,
                         &Event::ConfigLoaded {
                             platform: if cfg!(windows) { "windows" } else { "unix" }.into(),
+                            default_path: default_path.clone(),
                         },
                     )
                     .ok();
@@ -65,12 +72,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                     dispatch(wv, &Event::BuildComplete).ok();
                 }
                 Ok(Action::ChooseDirectory) => {
-                    let default = dirs::desktop_dir().expect("getting desktop directory");
                     let path = wv
                         .dialog()
-                        .choose_directory("Choose output directory", &default)
+                        .choose_directory("Choose output directory", &default_path)
                         .expect("selecting output directory")
-                        .unwrap_or(default);
+                        .unwrap_or_else(|| default_path.clone());
                     dispatch(wv, &Event::DirectoryChosen { path }).ok();
                 }
                 _ => {}

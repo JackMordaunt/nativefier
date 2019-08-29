@@ -1,5 +1,6 @@
 var Config = {
     platform: null,
+    default_path: null,
 };
 
 // Actions which get sent to the backend.
@@ -33,6 +34,7 @@ var Event = (function () {
             switch (event.type) {
                 case "ConfigLoaded":
                     Config = event;
+                    Gui.set_directory(Config.default_path);
                     break;
                 case "DirectoryChosen":
                     Gui.set_directory(event.path);
