@@ -16,7 +16,7 @@ var Action = (function () {
             send({ type: "LoadConfig" });
         },
         build_app: function (name, url, directory) {
-            send({ type: "Build", name, url, directory });
+            send({ type: "Build", name: name, url: url, directory: directory });
         },
         choose_directory: function () {
             send({ type: "ChooseDirectory" });
@@ -85,7 +85,7 @@ var Gui = (function () {
                 button.append($("<span> > </span>"));
             });
             button.append(end);
-            button.data({ path });
+            button.data({ path: path });
         },
         build_complete: function () {
             $("#build-status").append("<span>done</span>");
