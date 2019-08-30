@@ -21,7 +21,7 @@ enum Action {
         directory: String,
     },
     ChooseDirectory,
-    LoadConfig,
+    Initialize,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -30,7 +30,7 @@ enum Event {
     DirectoryChosen {
         path: PathBuf,
     },
-    ConfigLoaded {
+    Initialized {
         platform: String,
         default_path: PathBuf,
     },
@@ -84,10 +84,10 @@ struct App {
 impl App {
     fn handle(&self, wv: &mut WebView<()>, action: Action) -> WVResult {
         match action {
-            Action::LoadConfig => {
+            Action::Initialize => {
                 dispatch(
                     wv,
-                    &Event::ConfigLoaded {
+                    &Event::Initialized {
                         platform: if cfg!(windows) { "windows" } else { "unix" }.into(),
                         default_path: self.default_path.clone(),
                     },
@@ -120,6 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let html = format!(
         include_str!("ui/index.html"),
         style = format!("<style>{}</style>", include_str!("ui/style.css")),
+        polyfill = format!("<script>{}</script>", include_str!("ui/polyfill.js")),
         cash = format!("<script>{}</script>", include_str!("ui/cash.min.js")),
         app = format!("<script>{}</script>", include_str!("ui/app.js"),),
     );

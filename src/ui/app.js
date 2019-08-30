@@ -1,8 +1,3 @@
-var Config = {
-    platform: null,
-    default_path: null,
-};
-
 // Actions which get sent to the backend.
 var Action = (function () {
     "use strict";
@@ -12,8 +7,8 @@ var Action = (function () {
     }
 
     return {
-        load_config: function () {
-            send({ type: "LoadConfig" });
+        boot: function () {
+            send({ type: "Initialize" });
         },
         build_app: function (name, url, directory) {
             send({ type: "Build", name: name, url: url, directory: directory });
@@ -31,9 +26,9 @@ var Event = (function () {
     return {
         dispatch: function (event) {
             switch (event.type) {
-                case "ConfigLoaded":
-                    Config = event;
-                    Gui.set_directory(Config.default_path);
+                case "Initialized":
+                    var state = Gui.state(event.config);
+                    Gui.set_directory(state.default_path);
                     break;
                 case "DirectoryChosen":
                     Gui.set_directory(event.path);
@@ -51,6 +46,17 @@ var Gui = (function () {
     "use strict";
 
     return {
+        _state: {
+            platform: null,
+            default_path: null,
+        },
+        _clone: function (obj) {
+            return JSON.parse(JSON.stringify(obj));
+        },
+        // State merges any provided object and returns a read-only copy.
+        state: function (new_state) {
+            return this._clone(Object.assign(this._state, new_state));
+        },
         boot: function () {
             // initialise event handlers 
             // connects ui events to Actions
@@ -64,11 +70,11 @@ var Gui = (function () {
                 Action.build_app($("#name").val(), $("#url").val(), $("#directory").data().path);
             })
 
-            Action.load_config();
+            Action.boot();
         },
         set_directory: function (path) {
             var pattern;
-            if (Config.platform == "windows") {
+            if (this.state().platform == "windows") {
                 pattern = /:\\|\\/;
             } else {
                 pattern = "/";
