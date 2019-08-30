@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 mod bundle;
 mod error;
 mod infer;
@@ -34,60 +35,6 @@ enum Event {
         default_path: PathBuf,
     },
     BuildComplete,
-}
-
-fn main() -> Result<(), Box<dyn Error>> {
-    set_dpi_aware();
-    let html = format!(
-        include_str!("ui/index.html"),
-        style = format!("<style>{}</style>", include_str!("ui/style.css")),
-        cash = format!("<script>{}</script>", include_str!("ui/cash.min.js")),
-        app = format!("<script>{}</script>", include_str!("ui/app.js"),),
-    );
-    let default_path = dirs::desktop_dir().expect("loading desktop directory");
-    let wv = web_view::builder()
-        .title("nativefier")
-        .resizable(true)
-        .size(400, 300)
-        .content(Content::Html(html))
-        .user_data(())
-        .invoke_handler(move |wv: &mut WebView<()>, arg: &str| {
-            let action = serde_json::from_str::<Action>(arg);
-            println!("{:?}", action);
-            match action {
-                Ok(Action::LoadConfig) => {
-                    dispatch(
-                        wv,
-                        &Event::ConfigLoaded {
-                            platform: if cfg!(windows) { "windows" } else { "unix" }.into(),
-                            default_path: default_path.clone(),
-                        },
-                    )
-                    .ok();
-                }
-                Ok(Action::Build {
-                    name,
-                    url,
-                    directory,
-                }) => {
-                    build(name, url, directory).expect("building app");
-                    dispatch(wv, &Event::BuildComplete).ok();
-                }
-                Ok(Action::ChooseDirectory) => {
-                    let path = wv
-                        .dialog()
-                        .choose_directory("Choose output directory", &default_path)
-                        .expect("selecting output directory")
-                        .unwrap_or_else(|| default_path.clone());
-                    dispatch(wv, &Event::DirectoryChosen { path }).ok();
-                }
-                _ => {}
-            };
-            Ok(())
-        })
-        .build()?;
-    wv.run()?;
-    Ok(())
 }
 
 fn dispatch(wv: &mut WebView<()>, event: &Event) -> WVResult {
@@ -128,4 +75,72 @@ fn build(name: String, url: String, directory: String) -> Result<(), Box<dyn ::s
         .bundle()
         .map_err(|err| format!("bundling MacOS app: {}", err).into())
     }
+}
+
+struct App {
+    default_path: PathBuf,
+}
+
+impl App {
+    fn handle(&self, wv: &mut WebView<()>, action: Action) -> WVResult {
+        match action {
+            Action::LoadConfig => {
+                dispatch(
+                    wv,
+                    &Event::ConfigLoaded {
+                        platform: if cfg!(windows) { "windows" } else { "unix" }.into(),
+                        default_path: self.default_path.clone(),
+                    },
+                )
+                .ok();
+            }
+            Action::Build {
+                name,
+                url,
+                directory,
+            } => {
+                build(name, url, directory).expect("building app");
+                dispatch(wv, &Event::BuildComplete).ok();
+            }
+            Action::ChooseDirectory => {
+                let path = wv
+                    .dialog()
+                    .choose_directory("Choose output directory", &self.default_path)
+                    .expect("selecting output directory")
+                    .unwrap_or_else(|| self.default_path.clone());
+                dispatch(wv, &Event::DirectoryChosen { path }).ok();
+            }
+        };
+        Ok(())
+    }
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    set_dpi_aware();
+    let html = format!(
+        include_str!("ui/index.html"),
+        style = format!("<style>{}</style>", include_str!("ui/style.css")),
+        cash = format!("<script>{}</script>", include_str!("ui/cash.min.js")),
+        app = format!("<script>{}</script>", include_str!("ui/app.js"),),
+    );
+    let app = App {
+        default_path: dirs::desktop_dir().expect("loading desktop directory"),
+    };
+    let wv = web_view::builder()
+        .title("nativefier")
+        .resizable(true)
+        .size(400, 300)
+        .content(Content::Html(html))
+        .user_data(())
+        .invoke_handler(move |wv, msg| {
+            match serde_json::from_str::<Action>(msg)
+                .map_err(|err| format!("deserializing json: {:?}", err))
+            {
+                Ok(action) => app.handle(wv, action),
+                Err(err) => Err(web_view::Error::custom(err)),
+            }
+        })
+        .build()?;
+    wv.run()?;
+    Ok(())
 }
