@@ -141,9 +141,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     pretty_env_logger::init();
     let html = format!(
         include_str!("ui/index.html"),
-        style = format!("<style>{}</style>", include_str!("ui/style.css")),
-        cash = format!("<script>{}</script>", include_str!("ui/cash.min.js")),
-        app = format!("<script>{}</script>", include_str!("ui/app.js")),
+        style = format!(
+            "<style>{}</style>",
+            concat!(
+                include_str!("ui/semantic.min.css"),
+                include_str!("ui/style.css")
+            )
+        ),
+        script = format!(
+            "<script>{}</script>",
+            concat!(
+                include_str!("ui/jquery.min.js"),
+                include_str!("ui/semantic.min.js"),
+                include_str!("ui/app.js")
+            )
+        ),
     );
     let app = App {
         default_path: dirs::desktop_dir().expect("loading desktop directory"),

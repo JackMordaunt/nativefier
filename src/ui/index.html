@@ -2,26 +2,42 @@
 
 <head>
     {style}
-    {cash}
-    {app}
+    {script}
 </head>
 
 <body>
-    <section>
-        <div>
-            <input id="name" type="text"></input>
-            <input id="url" type="url"></input>
-            <button id="directory">
-                Choose a directory
-            </button>
-            <button id="build">
-                build
-            </button>
-            <span id="build-status">
-
-            </span>
+    <div id="container" class="ui middle aligned grid container">
+        <div class="row">
+            <div class="column">
+                <div class="ui form">
+                    <div class="field">
+                        <div class="ui input labeled">
+                            <div class="ui label">
+                                App
+                            </div>
+                            <input id="name" type="text" placeholder="Name of application">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <div class="ui input labeled">
+                            <div class="ui label">
+                                https://
+                            </div>
+                            <input id="url" type="url" placeholder="mysite.com">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <button class="ui button" id="directory">
+                            Choose a directory
+                        </button>
+                        <button class="ui button" id="build">
+                            build
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
-    </section>
+    </div>
 </body>
 
 </html>

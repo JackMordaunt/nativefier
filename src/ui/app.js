@@ -23,7 +23,7 @@ var Action = (function () {
         log: function () {
             var args = [];
             for (var ii = 0; ii < arguments.length; ii++) {
-                args.push(JSON.stringify(arguments[ii]));
+                args.push(arguments[ii]);
             }
             send({ type: "Log", msg: args.join(" ") });
         },
@@ -39,6 +39,7 @@ var Event = (function () {
 
     return {
         dispatch: function (event) {
+            Action.log("event:", JSON.stringify(event));
             switch (event.type) {
                 case "Initialized":
                     var dir = Gui.state(event).default_path;
