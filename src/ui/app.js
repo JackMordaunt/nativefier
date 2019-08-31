@@ -9,6 +9,7 @@ var Action = (function () {
     return {
         boot: function () {
             this.log("Action.boot");
+            // Fixme: window.onerror not in MSHTML webview!
             window.onerror = function (msg, uri, line) {
                 this.error(msg, uri, line);
             };
@@ -44,6 +45,9 @@ var Event = (function () {
                 case "Initialized":
                     var dir = Gui.state(event).default_path;
                     Gui.set_directory(dir);
+                    break;
+                case "Error":
+                    Gui.show_error(event);
                     break;
                 case "DirectoryChosen":
                     Gui.set_directory(event.path);
@@ -84,6 +88,8 @@ var Gui = (function () {
                 e.preventDefault();
                 Action.build_app($("#name").val(), $("#url").val(), $("#directory").data().path);
             })
+
+            $("#error-message").toggle(false);
         },
         set_directory: function (path) {
             var pattern;
@@ -109,6 +115,10 @@ var Gui = (function () {
         build_complete: function () {
             $("#build-status").append("<span>done</span>");
         },
+        show_error: function (err) {
+            $("#error-message .body").text(err.msg);
+            $("#error-message").toggle(true);
+        }
     }
 })();
 

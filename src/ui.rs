@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::error::Error;
 use std::path::PathBuf;
+use url::Url;
 use web_view::{Content, WVResult, WebView};
 
 fn dispatch(wv: &mut WebView<()>, event: &Event) -> WVResult {
@@ -66,6 +67,7 @@ enum Action {
     Log {
         msg: String,
     },
+    // Errors from the front-end.
     Error {
         msg: String,
         uri: Option<String>,
@@ -84,6 +86,10 @@ enum Event {
         default_path: PathBuf,
     },
     BuildComplete,
+    // Errors to display on the front-end.
+    Error {
+        msg: String,
+    },
 }
 
 struct App {
@@ -119,7 +125,20 @@ impl App {
                 url,
                 directory,
             } => {
-                build(name, url, directory).expect("building app");
+                let url: Url = match (&url).parse() {
+                    Ok(url) => url,
+                    Err(err) => {
+                        dispatch(
+                            wv,
+                            &Event::Error {
+                                msg: format!("malformed url: {}: {:?}", url, err),
+                            },
+                        )
+                        .ok();
+                        return Ok(());
+                    }
+                };
+                build(name, url.into_string(), directory).expect("building app");
                 dispatch(wv, &Event::BuildComplete).ok();
             }
             Action::ChooseDirectory => {
