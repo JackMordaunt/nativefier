@@ -8,6 +8,10 @@ var Action = (function () {
 
     return {
         boot: function () {
+            this.log("Action.boot");
+            window.onerror = function (msg, uri, line) {
+                this.error(msg, uri, line);
+            };
             send({ type: "Initialize" });
         },
         build_app: function (name, url, directory) {
@@ -15,6 +19,16 @@ var Action = (function () {
         },
         choose_directory: function () {
             send({ type: "ChooseDirectory" });
+        },
+        log: function () {
+            var args = [];
+            for (var ii = 0; ii < arguments.length; ii++) {
+                args.push(JSON.stringify(arguments[ii]));
+            }
+            send({ type: "Log", msg: args.join(" ") });
+        },
+        error: function (msg, uri, line) {
+            send({ type: "Error", msg: msg, uri: uri, line: line });
         },
     }
 })();
@@ -27,8 +41,8 @@ var Event = (function () {
         dispatch: function (event) {
             switch (event.type) {
                 case "Initialized":
-                    var state = Gui.state(event.config);
-                    Gui.set_directory(state.default_path);
+                    var dir = Gui.state(event).default_path;
+                    Gui.set_directory(dir);
                     break;
                 case "DirectoryChosen":
                     Gui.set_directory(event.path);
@@ -45,21 +59,21 @@ var Event = (function () {
 var Gui = (function () {
     "use strict";
 
+    var state = {
+        platform: "",
+        default_path: "",
+    };
+
+    var clone = function (obj) {
+        return JSON.parse(JSON.stringify(obj));
+    };
+
     return {
-        _state: {
-            platform: null,
-            default_path: null,
-        },
-        _clone: function (obj) {
-            return JSON.parse(JSON.stringify(obj));
-        },
-        // State merges any provided object and returns a read-only copy.
+        // state merges any provided object and returns a read-only copy.
         state: function (new_state) {
-            return this._clone(Object.assign(this._state, new_state));
+            return clone($.extend(state, new_state));
         },
         boot: function () {
-            // initialise event handlers 
-            // connects ui events to Actions
             $("#directory").on("click", function (e) {
                 e.preventDefault();
                 Action.choose_directory();
@@ -69,8 +83,6 @@ var Gui = (function () {
                 e.preventDefault();
                 Action.build_app($("#name").val(), $("#url").val(), $("#directory").data().path);
             })
-
-            Action.boot();
         },
         set_directory: function (path) {
             var pattern;
@@ -99,4 +111,7 @@ var Gui = (function () {
     }
 })();
 
-$(document).ready(Gui.boot);
+$(document).ready(function () {
+    Action.boot();
+    Gui.boot();
+});
