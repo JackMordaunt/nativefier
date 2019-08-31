@@ -132,13 +132,25 @@ impl App {
                     Ok(_) => {
                         match build(name, url, directory) {
                             Ok(_) => dispatch(wv, &Event::BuildComplete).ok(),
-                            Err(err) => dispatch(wv, &Event::Error {msg: format!("building app: {:?}", err)}).ok(),
+                            Err(err) => dispatch(
+                                wv,
+                                &Event::Error {
+                                    msg: format!("building app: {:?}", err),
+                                },
+                            )
+                            .ok(),
                         };
-                    },
+                    }
                     Err(ParseError::RelativeUrlWithoutBase) => {
                         match build(name, format!("https://{}", url), directory) {
                             Ok(_) => dispatch(wv, &Event::BuildComplete).ok(),
-                            Err(err) => dispatch(wv, &Event::Error {msg: format!("building app: {:?}", err)}).ok(),
+                            Err(err) => dispatch(
+                                wv,
+                                &Event::Error {
+                                    msg: format!("building app: {:?}", err),
+                                },
+                            )
+                            .ok(),
                         };
                     }
                     Err(err) => {
