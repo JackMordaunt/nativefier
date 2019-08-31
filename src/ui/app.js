@@ -86,8 +86,26 @@ var Gui = (function () {
 
             $("#build").on("click", function (e) {
                 e.preventDefault();
-                Action.build_app($("#name").val(), $("#url").val(), $("#directory").data().path);
+                if ($("form").form("is valid")) {
+                    Action.build_app($("#name").val(), $("#url").val(), $("#directory").data().path);
+                }
             })
+
+            $("form")
+                .form({
+                    on: "blur",
+                    fields: {
+                        url: {
+                            identifier: "url",
+                            rules: [
+                                {
+                                    type: "url",
+                                    prompt: "Please enter a url"
+                                }
+                            ]
+                        }
+                    }
+                });
 
             $("#error-message").toggle(false);
         },
