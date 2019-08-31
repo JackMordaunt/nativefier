@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::error::Error;
 use std::path::PathBuf;
-use url::Url;
+use url::{ParseError, Url};
 use web_view::{Content, WVResult, WebView};
 
 fn dispatch(wv: &mut WebView<()>, event: &Event) -> WVResult {
@@ -97,6 +97,9 @@ struct App {
 }
 
 impl App {
+    // Todo:
+    //  - Cleaner / Easier way to send application errors back to the frontend.
+    //  - Do we bother handling transport errors?
     fn handle(&self, wv: &mut WebView<()>, action: Action) -> WVResult {
         match &action {
             Action::Log { msg } => {
@@ -125,21 +128,29 @@ impl App {
                 url,
                 directory,
             } => {
-                let url: Url = match (&url).parse() {
-                    Ok(url) => url,
+                match (&url).parse::<Url>() {
+                    Ok(_) => {
+                        match build(name, url, directory) {
+                            Ok(_) => dispatch(wv, &Event::BuildComplete).ok(),
+                            Err(err) => dispatch(wv, &Event::Error {msg: format!("building app: {:?}", err)}).ok(),
+                        };
+                    },
+                    Err(ParseError::RelativeUrlWithoutBase) => {
+                        match build(name, format!("https://{}", url), directory) {
+                            Ok(_) => dispatch(wv, &Event::BuildComplete).ok(),
+                            Err(err) => dispatch(wv, &Event::Error {msg: format!("building app: {:?}", err)}).ok(),
+                        };
+                    }
                     Err(err) => {
                         dispatch(
                             wv,
                             &Event::Error {
-                                msg: format!("malformed url: {}: {:?}", url, err),
+                                msg: format!("malformed url: {:?}: {:?}", url, err),
                             },
                         )
                         .ok();
-                        return Ok(());
                     }
                 };
-                build(name, url.into_string(), directory).expect("building app");
-                dispatch(wv, &Event::BuildComplete).ok();
             }
             Action::ChooseDirectory => {
                 let path = wv
