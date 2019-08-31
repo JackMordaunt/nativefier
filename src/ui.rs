@@ -1,4 +1,3 @@
-#![windows_subsystem = "windows"]
 mod bundle;
 mod error;
 mod infer;
@@ -6,36 +5,13 @@ mod infer;
 use bundle::Bundler;
 use dirs;
 use infer::infer_icon;
+use log::{error, trace};
+use pretty_env_logger;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::error::Error;
 use std::path::PathBuf;
 use web_view::{Content, WVResult, WebView};
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "type")]
-enum Action {
-    Build {
-        name: String,
-        url: String,
-        directory: String,
-    },
-    ChooseDirectory,
-    Initialize,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "type")]
-enum Event {
-    DirectoryChosen {
-        path: PathBuf,
-    },
-    Initialized {
-        platform: String,
-        default_path: PathBuf,
-    },
-    BuildComplete,
-}
 
 fn dispatch(wv: &mut WebView<()>, event: &Event) -> WVResult {
     let js = format!(
@@ -77,12 +53,56 @@ fn build(name: String, url: String, directory: String) -> Result<(), Box<dyn ::s
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type")]
+enum Action {
+    Build {
+        name: String,
+        url: String,
+        directory: String,
+    },
+    ChooseDirectory,
+    Initialize,
+    Log {
+        msg: String,
+    },
+    Error {
+        msg: String,
+        uri: Option<String>,
+        line: Option<String>,
+    },
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type")]
+enum Event {
+    DirectoryChosen {
+        path: PathBuf,
+    },
+    Initialized {
+        platform: String,
+        default_path: PathBuf,
+    },
+    BuildComplete,
+}
+
 struct App {
     default_path: PathBuf,
 }
 
 impl App {
     fn handle(&self, wv: &mut WebView<()>, action: Action) -> WVResult {
+        match &action {
+            Action::Log { msg } => {
+                trace!("[  js  ] {}", msg.trim_matches('"'));
+            }
+            Action::Error { .. } => {
+                error!("[  js  ] {:?}", action);
+            }
+            _ => {
+                trace!("[action] {:?}", action);
+            }
+        };
         match action {
             Action::Initialize => {
                 dispatch(
@@ -110,6 +130,7 @@ impl App {
                     .unwrap_or_else(|| self.default_path.clone());
                 dispatch(wv, &Event::DirectoryChosen { path }).ok();
             }
+            _ => {}
         };
         Ok(())
     }
@@ -117,12 +138,12 @@ impl App {
 
 fn main() -> Result<(), Box<dyn Error>> {
     set_dpi_aware();
+    pretty_env_logger::init();
     let html = format!(
         include_str!("ui/index.html"),
         style = format!("<style>{}</style>", include_str!("ui/style.css")),
-        polyfill = format!("<script>{}</script>", include_str!("ui/polyfill.js")),
         cash = format!("<script>{}</script>", include_str!("ui/cash.min.js")),
-        app = format!("<script>{}</script>", include_str!("ui/app.js"),),
+        app = format!("<script>{}</script>", include_str!("ui/app.js")),
     );
     let app = App {
         default_path: dirs::desktop_dir().expect("loading desktop directory"),
