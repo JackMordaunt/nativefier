@@ -270,8 +270,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 error!("{:?}", err);
             }
         }
-        if let Some(Err(err)) = wv.step() {
-            error!("{:?}", err);
-        }
+        match wv.step() {
+            Some(Ok(_)) => continue,
+            Some(Err(err)) => error!("{:?}", err),
+            None => return Ok(()),
+        };
     }
 }
