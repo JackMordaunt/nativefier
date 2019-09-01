@@ -11,14 +11,17 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::error::Error;
 use std::path::PathBuf;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use url::{ParseError, Url};
 use web_view::{Content, WVResult, WebView};
 
 // dispatch injects js that evaluates a call to the event dispatcher.
 fn dispatch(wv: &mut WebView<()>, event: &Event) -> WVResult {
+    use web_view::Error;
     let js = format!(
         "Event.dispatch({})",
-        serde_json::to_string(event).expect("serializing event"),
+        serde_json::to_string(event)
+            .map_err(|err| Error::custom(Box::new(format!("serializing event: {:?}", &err))))?,
     );
     wv.eval(&js)
 }
@@ -108,12 +111,17 @@ impl Event {
     }
 }
 
+// App performs the "real" work in it's own thread.
+// This allows us to separate the "ui" from the "application".
+// The API is structured around actions and events.
 struct App {
+    actions: Receiver<Action>,
+    events: Sender<Event>,
     default_path: PathBuf,
 }
 
 impl App {
-    fn handle(&self, wv: &mut WebView<()>, action: Action) -> Option<Event> {
+    fn handle(&self, action: Action) -> Option<Event> {
         match &action {
             Action::Log { msg } => {
                 trace!("[  js  ] {}", msg.trim_matches('"'));
@@ -138,16 +146,47 @@ impl App {
                 Ok(_) => Some(Event::BuildComplete),
                 Err(err) => Some(Event::error(format!("building app: {:?}", err))),
             },
-            Action::ChooseDirectory => {
-                let path = wv
-                    .dialog()
-                    .choose_directory("Choose output directory", &self.default_path)
-                    .expect("selecting output directory")
-                    .unwrap_or_else(|| self.default_path.clone());
-                Some(Event::DirectoryChosen { path })
-            }
+            // Action::ChooseDirectory => {
+            //     let path = wv
+            //         .dialog()
+            //         .choose_directory("Choose output directory", &self.default_path)
+            //         .expect("selecting output directory")
+            //         .unwrap_or_else(|| self.default_path.clone());
+            //     Some(Event::DirectoryChosen { path })
+            // }
             _ => None,
         }
+    }
+
+    fn start(self) {
+        std::thread::spawn(move || {
+            for action in &self.actions {
+                if let Some(event) = self.handle(action) {
+                    self.events.send(event).ok();
+                }
+            }
+        });
+    }
+}
+
+// Invoker closes over a channel to send Actions.
+//
+// Note: Allows precise capturing of state where a move closure
+// would be too greedy.
+struct Invoker {
+    actions: Sender<Action>,
+}
+
+impl Invoker {
+    fn handle(&self, _wv: &mut WebView<()>, msg: &str) -> WVResult {
+        use web_view::Error;
+        serde_json::from_str::<Action>(msg)
+            .map_err(|err| Error::custom(Box::new(format!("deserializing json: {:?}", err))))
+            .and_then(|action| {
+                self.actions
+                    .send(action)
+                    .map_err(|err| Error::custom(Box::new(format!("sending action: {:?}", err))))
+            })
     }
 }
 
@@ -172,26 +211,35 @@ fn main() -> Result<(), Box<dyn Error>> {
             )
         ),
     );
+    let (event_tx, event_rx) = channel::<Event>();
+    let (action_tx, action_rx) = channel::<Action>();
     let app = App {
+        actions: action_rx,
+        events: event_tx,
         default_path: dirs::desktop_dir().expect("loading desktop directory"),
     };
-    let wv = web_view::builder()
+    app.start();
+    let mut wv = web_view::builder()
         .title("nativefier")
         .resizable(true)
         .size(400, 250)
         .content(Content::Html(html))
         .user_data(())
-        .invoke_handler(move |wv, msg| {
-            serde_json::from_str::<Action>(msg)
-                .map_err(|err| {
-                    web_view::Error::custom(Box::new(format!("deserializing json: {:?}", err)))
-                })
-                .and_then(|action| match app.handle(wv, action) {
-                    Some(event) => dispatch(wv, &event),
-                    None => Ok(()),
-                })
+        .invoke_handler(|wv, msg| {
+            Invoker {
+                actions: action_tx.clone(),
+            }
+            .handle(wv, msg)
         })
         .build()?;
-    wv.run()?;
-    Ok(())
+    loop {
+        for event in event_rx.try_iter() {
+            if let Err(err) = dispatch(&mut wv, &event) {
+                error!("{:?}", err);
+            }
+        }
+        if let Some(Err(err)) = wv.step() {
+            error!("{:?}", err);
+        }
+    }
 }
