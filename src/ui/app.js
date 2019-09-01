@@ -95,11 +95,21 @@ var Gui = (function () {
                 .form({
                     on: "blur",
                     fields: {
+                        name: {
+                            identifier: "name",
+                            rules: [
+                                {
+                                    type: "empty",
+                                    prompt: "Please enter a name"
+                                }
+                            ]
+                        },
                         url: {
                             identifier: "url",
                             rules: [
                                 {
-                                    type: "url",
+                                    type: "regExp",
+                                    value: /(http:\/\/|https:\/\/)?([^\s"'<>]+)+\/?/,
                                     prompt: "Please enter a url"
                                 }
                             ]
