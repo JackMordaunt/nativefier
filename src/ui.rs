@@ -205,7 +205,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let wv = web_view::builder()
         .title("nativefier")
         .resizable(true)
-        .size(400, 300)
+        .size(400, 250)
         .content(Content::Html(html))
         .user_data(())
         .invoke_handler(move |wv, msg| {
