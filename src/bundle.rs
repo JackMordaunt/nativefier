@@ -2,6 +2,7 @@ use crate::infer;
 use icns;
 use std::io::{BufWriter, Write};
 use std::{env, error::Error, fs, path::PathBuf, process::Command};
+use url::Url;
 
 /// Bundler is any object that can produce an executable bundle.
 /// This allows us to be polymorphic across operating systems (macos, windows,
@@ -17,7 +18,7 @@ pub struct Darwin<'a> {
     /// Name of the application.
     pub name: &'a str,
     /// Url to wrap.
-    pub url: &'a str,
+    pub url: &'a Url,
     /// Filepath to icon.
     pub icon: infer::Icon,
 }
@@ -49,7 +50,7 @@ impl Bundler for Darwin<'_> {
                 include_str!("../res/launch.sh"),
                 executable = &executable,
                 title = &self.name,
-                url = &self.url,
+                url = &self.url.as_str(),
             )
             .as_bytes(),
         )?;
@@ -63,7 +64,7 @@ impl Bundler for Darwin<'_> {
 pub struct Windows<'a> {
     pub dir: &'a str,
     pub name: &'a str,
-    pub url: &'a str,
+    pub url: &'a Url,
     pub icon: infer::Icon,
 }
 

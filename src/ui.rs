@@ -31,8 +31,17 @@ fn set_dpi_aware() {
 #[cfg(not(target_os = "windows"))]
 fn set_dpi_aware() {}
 
-fn build(name: String, url: String, directory: String) -> Result<(), Box<dyn ::std::error::Error>> {
-    let icon = infer_icon(&url.parse()?).map_err(|err| format!("inferring icon: {}", err))?;
+// parse_url accepts absolute and relative urls.
+fn parse_url(url: &str) -> Result<Url, Box<dyn Error>> {
+    match url.parse() {
+        Ok(u) => Ok(u),
+        Err(ParseError::RelativeUrlWithoutBase) => parse_url(&format!("https://{}", url)),
+        Err(err) => Err(format!("malformed url: {:?}", err).into()),
+    }
+}
+
+fn build(name: String, url: &Url, directory: String) -> Result<(), Box<dyn ::std::error::Error>> {
+    let icon = infer_icon(&url).map_err(|err| format!("inferring icon: {}", err))?;
     if cfg!(windows) {
         bundle::Windows {
             dir: &directory,
@@ -92,6 +101,12 @@ enum Event {
     },
 }
 
+impl Event {
+    fn error<S: Into<String>>(msg: S) -> Self {
+        Event::Error { msg: msg.into() }
+    }
+}
+
 struct App {
     default_path: PathBuf,
 }
@@ -128,40 +143,13 @@ impl App {
                 url,
                 directory,
             } => {
-                match (&url).parse::<Url>() {
-                    Ok(_) => {
-                        match build(name, url, directory) {
-                            Ok(_) => dispatch(wv, &Event::BuildComplete).ok(),
-                            Err(err) => dispatch(
-                                wv,
-                                &Event::Error {
-                                    msg: format!("building app: {:?}", err),
-                                },
-                            )
-                            .ok(),
-                        };
-                    }
-                    Err(ParseError::RelativeUrlWithoutBase) => {
-                        match build(name, format!("https://{}", url), directory) {
-                            Ok(_) => dispatch(wv, &Event::BuildComplete).ok(),
-                            Err(err) => dispatch(
-                                wv,
-                                &Event::Error {
-                                    msg: format!("building app: {:?}", err),
-                                },
-                            )
-                            .ok(),
-                        };
-                    }
-                    Err(err) => {
-                        dispatch(
-                            wv,
-                            &Event::Error {
-                                msg: format!("malformed url: {:?}: {:?}", url, err),
-                            },
-                        )
-                        .ok();
-                    }
+                match parse_url(&url).and_then(|u| build(name, &u, directory)) {
+                    Ok(_) => dispatch(wv, &Event::BuildComplete).ok(),
+                    Err(err) => dispatch(
+                        wv,
+                        &Event::error(format!("building app: {:?}", err)),
+                    )
+                    .ok(),
                 };
             }
             Action::ChooseDirectory => {

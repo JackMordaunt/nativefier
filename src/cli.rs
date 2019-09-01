@@ -83,7 +83,7 @@ fn main() {
                 bundle::Windows {
                     dir: &dir,
                     name: &name,
-                    url: &url.into_string(),
+                    url: &url,
                     icon: icon,
                 }
                 .bundle()
@@ -92,7 +92,7 @@ fn main() {
                 bundle::Darwin {
                     dir: &dir,
                     name: &name,
-                    url: &url.into_string(),
+                    url: &url,
                     icon: icon,
                 }
                 .bundle()
