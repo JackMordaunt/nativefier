@@ -13,7 +13,7 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use url::{ParseError, Url};
-use web_view::{Content, WVResult, WebView};
+use web_view::{Content, Handle, WVResult, WebView};
 
 // dispatch injects js that evaluates a call to the event dispatcher.
 fn dispatch(wv: &mut WebView<()>, event: &Event) -> WVResult {
@@ -118,6 +118,7 @@ struct App {
     actions: Receiver<Action>,
     events: Sender<Event>,
     default_path: PathBuf,
+    wv: Handle<()>,
 }
 
 impl App {
@@ -146,14 +147,16 @@ impl App {
                 Ok(_) => Some(Event::BuildComplete),
                 Err(err) => Some(Event::error(format!("building app: {:?}", err))),
             },
-            // Action::ChooseDirectory => {
-            //     let path = wv
-            //         .dialog()
-            //         .choose_directory("Choose output directory", &self.default_path)
-            //         .expect("selecting output directory")
-            //         .unwrap_or_else(|| self.default_path.clone());
-            //     Some(Event::DirectoryChosen { path })
-            // }
+            Action::ChooseDirectory => {
+                let path = self
+                    .choose_directory()
+                    .and_then(|rx| rx.recv().map_err(web_view::Error::custom))
+                    .and_then(|x| x);
+                match path {
+                    Ok(path) => Some(Event::DirectoryChosen { path }),
+                    Err(err) => Some(Event::error(format!("choosing directory: {:?}", err))),
+                }
+            }
             _ => None,
         }
     }
@@ -166,6 +169,34 @@ impl App {
                 }
             }
         });
+    }
+
+    // choose_directory opens a folder picker dialog async.
+    //
+    // Since the webview contains code for opening a dialog we dispatch
+    // on the ui event loop and collect the result via a channel.
+    //
+    // If no path is returned from the dialog we treat this as an error,
+    // rather than silenty ignoring it.
+    // All errors are mapped to web_vew::Error for sanity.
+    //
+    // Note(jfm): A lot of the mess due to handling all the error cases
+    // including channel operations, which afaik are unlikely to occur.
+    fn choose_directory(&self) -> WVResult<Receiver<WVResult<PathBuf>>> {
+        let (tx, rx) = channel::<WVResult<PathBuf>>();
+        let default_path = self.default_path.clone();
+        self.wv.dispatch(move |wv| {
+            tx.send(
+                wv.dialog()
+                    .choose_directory("Select Directory", default_path)
+                    .transpose()
+                    .ok_or_else(|| "failed to open file explorer".to_owned())
+                    .map_err(web_view::Error::custom)
+                    .and_then(|x| x),
+            )
+            .map_err(web_view::Error::custom)
+        })?;
+        Ok(rx)
     }
 }
 
@@ -213,12 +244,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     let (event_tx, event_rx) = channel::<Event>();
     let (action_tx, action_rx) = channel::<Action>();
-    let app = App {
-        actions: action_rx,
-        events: event_tx,
-        default_path: dirs::desktop_dir().expect("loading desktop directory"),
-    };
-    app.start();
     let mut wv = web_view::builder()
         .title("nativefier")
         .resizable(true)
@@ -232,6 +257,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             .handle(wv, msg)
         })
         .build()?;
+    let app = App {
+        actions: action_rx,
+        events: event_tx,
+        default_path: dirs::desktop_dir().expect("loading desktop directory"),
+        wv: wv.handle(),
+    };
+    app.start();
     loop {
         for event in event_rx.try_iter() {
             if let Err(err) = dispatch(&mut wv, &event) {
