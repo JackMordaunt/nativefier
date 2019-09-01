@@ -14,6 +14,7 @@ use std::path::PathBuf;
 use url::{ParseError, Url};
 use web_view::{Content, WVResult, WebView};
 
+// dispatch injects js that evaluates a call to the event dispatcher.
 fn dispatch(wv: &mut WebView<()>, event: &Event) -> WVResult {
     let js = format!(
         "Event.dispatch({})",
@@ -112,10 +113,7 @@ struct App {
 }
 
 impl App {
-    // Todo:
-    //  - Cleaner / Easier way to send application errors back to the frontend.
-    //  - Do we bother handling transport errors?
-    fn handle(&self, wv: &mut WebView<()>, action: Action) -> WVResult {
+    fn handle(&self, wv: &mut WebView<()>, action: Action) -> Option<Event> {
         match &action {
             Action::Log { msg } => {
                 trace!("[  js  ] {}", msg.trim_matches('"'));
@@ -128,41 +126,28 @@ impl App {
             }
         };
         match action {
-            Action::Initialize => {
-                dispatch(
-                    wv,
-                    &Event::Initialized {
-                        platform: if cfg!(windows) { "windows" } else { "unix" }.into(),
-                        default_path: self.default_path.clone(),
-                    },
-                )
-                .ok();
-            }
+            Action::Initialize => Some(Event::Initialized {
+                platform: if cfg!(windows) { "windows" } else { "unix" }.into(),
+                default_path: self.default_path.clone(),
+            }),
             Action::Build {
                 name,
                 url,
                 directory,
-            } => {
-                match parse_url(&url).and_then(|u| build(name, &u, directory)) {
-                    Ok(_) => dispatch(wv, &Event::BuildComplete).ok(),
-                    Err(err) => dispatch(
-                        wv,
-                        &Event::error(format!("building app: {:?}", err)),
-                    )
-                    .ok(),
-                };
-            }
+            } => match parse_url(&url).and_then(|u| build(name, &u, directory)) {
+                Ok(_) => Some(Event::BuildComplete),
+                Err(err) => Some(Event::error(format!("building app: {:?}", err))),
+            },
             Action::ChooseDirectory => {
                 let path = wv
                     .dialog()
                     .choose_directory("Choose output directory", &self.default_path)
                     .expect("selecting output directory")
                     .unwrap_or_else(|| self.default_path.clone());
-                dispatch(wv, &Event::DirectoryChosen { path }).ok();
+                Some(Event::DirectoryChosen { path })
             }
-            _ => {}
-        };
-        Ok(())
+            _ => None,
+        }
     }
 }
 
@@ -197,12 +182,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .content(Content::Html(html))
         .user_data(())
         .invoke_handler(move |wv, msg| {
-            match serde_json::from_str::<Action>(msg)
-                .map_err(|err| format!("deserializing json: {:?}", err))
-            {
-                Ok(action) => app.handle(wv, action),
-                Err(err) => Err(web_view::Error::custom(err)),
-            }
+            serde_json::from_str::<Action>(msg)
+                .map_err(|err| {
+                    web_view::Error::custom(Box::new(format!("deserializing json: {:?}", err)))
+                })
+                .and_then(|action| match app.handle(wv, action) {
+                    Some(event) => dispatch(wv, &event),
+                    None => Ok(()),
+                })
         })
         .build()?;
     wv.run()?;
