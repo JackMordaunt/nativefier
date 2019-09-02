@@ -21,6 +21,8 @@ pub struct Darwin<'a> {
     pub url: &'a Url,
     /// Filepath to icon.
     pub icon: Option<infer::Icon>,
+    /// Blob of binary for the executable.
+    pub executable: &'a [u8]
 }
 
 impl Bundler for Darwin<'_> {
@@ -38,9 +40,9 @@ impl Bundler for Darwin<'_> {
         for dir in ["Contents/MacOS", "Contents/Resources"].iter() {
             fs::create_dir_all(app.join(dir))?;
         }
-        fs::copy(
-            env::current_exe()?.to_path_buf(),
+        fs::write(
             app.join(format!("Contents/MacOS/{0}", &executable)),
+            &self.executable,
         )?;
         fs::File::create(&plist)?.write_all(
             format!(include_str!("../res/Info.plist"), executable = &executable,).as_bytes(),
@@ -68,6 +70,7 @@ pub struct Windows<'a> {
     pub name: &'a str,
     pub url: &'a Url,
     pub icon: Option<infer::Icon>,
+    pub executable: &'a [u8],
 }
 
 /// Bundler uses an executable "warp-packer" to create a standalone binary,
@@ -89,7 +92,7 @@ impl Bundler for Windows<'_> {
         let icon_path = workspace.join("icon.ico");
         let rcedit = workspace.join("rcedit.exe");
         fs::create_dir_all(&input)?;
-        fs::copy(env::current_exe()?.to_path_buf(), &exec)?;
+        fs::write(&exec, &self.executable)?;
         fs::File::create(&launcher)?.write_all(
             format!(
                 include_str!("../res/launch.bat"),

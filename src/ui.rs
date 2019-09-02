@@ -52,6 +52,7 @@ fn build(name: String, url: &Url, directory: String) -> Result<(), Box<dyn ::std
             name: &name,
             url: &url,
             icon: icon,
+            executable: &[0],
         }
         .bundle()
         .map_err(|err| format!("bundling Windows app: {}", err).into())
@@ -61,6 +62,7 @@ fn build(name: String, url: &Url, directory: String) -> Result<(), Box<dyn ::std
             name: &name,
             url: &url,
             icon: icon,
+            executable: &[0],
         }
         .bundle()
         .map_err(|err| format!("bundling MacOS app: {}", err).into())
@@ -182,6 +184,8 @@ impl App {
     //
     // Note(jfm): A lot of the mess due to handling all the error cases
     // including channel operations, which afaik are unlikely to occur.
+    //
+    // Todo: [windows] Call out to winapi directly for reliability.
     fn choose_directory(&self) -> WVResult<Receiver<WVResult<PathBuf>>> {
         let (tx, rx) = channel::<WVResult<PathBuf>>();
         let default_path = self.default_path.clone();

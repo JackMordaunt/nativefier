@@ -85,6 +85,7 @@ fn main() {
                     name: &name,
                     url: &url,
                     icon: icon,
+                    executable: &[0],
                 }
                 .bundle()
                 .expect("bundling Windows app");
@@ -94,6 +95,7 @@ fn main() {
                     name: &name,
                     url: &url,
                     icon: icon,
+                    executable: &[0],
                 }
                 .bundle()
                 .expect("bundling MacOS app");
