@@ -16,6 +16,7 @@ var Action = (function () {
             send({ type: "Initialize" });
         },
         build_app: function (name, url, directory) {
+            Event.dispatch({ type: "BuildStarted" });
             send({ type: "Build", name: name, url: url, directory: directory });
         },
         choose_directory: function () {
@@ -52,8 +53,11 @@ var Event = (function () {
                 case "DirectoryChosen":
                     Gui.set_directory(event.path);
                     break;
+                case "BuildStarted":
+                    Gui.is_building(true);
+                    break;
                 case "BuildComplete":
-                    Gui.build_complete();
+                    Gui.is_building(false);
                     break;
             }
         }
@@ -140,8 +144,8 @@ var Gui = (function () {
             button.append(end);
             button.data({ path: path });
         },
-        build_complete: function () {
-            $("#build-status").append("<span>done</span>");
+        is_building: function (is_building) {
+            $("#build").toggleClass("loading", is_building);
         },
         show_error: function (err) {
             $("#error-message .body").text(err.msg);
