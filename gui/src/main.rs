@@ -1,11 +1,6 @@
-mod bundle;
-mod error;
-mod infer;
-
-use bundle::Bundler;
 use dirs;
-use infer::infer_icon;
 use log::{error, trace};
+use nativefier::{infer_icon, Bundler, Darwin, Windows};
 use pretty_env_logger;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -47,7 +42,7 @@ fn parse_url(url: &str) -> Result<Url, Box<dyn Error>> {
 fn build(name: String, url: &Url, directory: String) -> Result<(), Box<dyn ::std::error::Error>> {
     let icon = Some(infer_icon(&url).map_err(|err| format!("inferring icon: {}", err))?);
     if cfg!(windows) {
-        bundle::Windows {
+        Windows {
             dir: &directory,
             name: &name,
             url: &url,
@@ -57,7 +52,7 @@ fn build(name: String, url: &Url, directory: String) -> Result<(), Box<dyn ::std
         .bundle()
         .map_err(|err| format!("bundling Windows app: {}", err).into())
     } else {
-        bundle::Darwin {
+        Darwin {
             dir: &directory,
             name: &name,
             url: &url,

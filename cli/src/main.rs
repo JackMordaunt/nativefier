@@ -1,17 +1,11 @@
 #![windows_subsystem = "windows"]
-mod bundle;
-mod error;
-mod infer;
-
-use crate::bundle::Bundler;
-use crate::infer::{infer_icon, infer_name};
 use clap::{App, Arg, SubCommand};
+use nativefier::{infer_icon, infer_name, Bundler, Darwin, Windows};
 use pretty_env_logger;
 use url::Url;
 use web_view::*;
 
 fn main() {
-    set_dpi_aware();
     pretty_env_logger::init();
     let matches = App::new("nativefier")
         .version("0.2.0")
@@ -80,7 +74,7 @@ fn main() {
             };
             let icon = Some(infer_icon(&icon_url).expect("inferring icon"));
             if cfg!(windows) {
-                bundle::Windows {
+                Windows {
                     dir: &dir,
                     name: &name,
                     url: &url,
@@ -90,7 +84,7 @@ fn main() {
                 .bundle()
                 .expect("bundling Windows app");
             } else {
-                bundle::Darwin {
+                Darwin {
                     dir: &dir,
                     name: &name,
                     url: &url,
@@ -103,12 +97,3 @@ fn main() {
         }
     };
 }
-
-#[cfg(target_os = "windows")]
-fn set_dpi_aware() {
-    use winapi::um::shellscalingapi::{SetProcessDpiAwareness, PROCESS_SYSTEM_DPI_AWARE};
-    unsafe { SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE) };
-}
-
-#[cfg(not(target_os = "windows"))]
-fn set_dpi_aware() {}

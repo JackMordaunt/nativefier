@@ -1,0 +1,25 @@
+[package]
+name = "gui"
+version = "0.2.0"
+authors = ["Jack Mordaunt <jackmordaunt@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+web-view = "0.4.1"
+serde_json = "1.0.40"
+url = "2.1.0"
+log = "0.4.8"
+pretty_env_logger = "0.3.1"
+serde = "1.0.99"
+dirs = "2.0.2"
+
+[dependencies.nativefier]
+path = "../nativefier"
+
+[target.'cfg(windows)'.dependencies]
+# Required for DPI scaling on windows. Sigh.
+winapi = { version = "0.3.8", features = ["shellscalingapi"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1.11"
+image = "0.22.1"

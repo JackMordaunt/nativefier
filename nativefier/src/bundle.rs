@@ -1,7 +1,7 @@
 use crate::infer;
 use icns;
 use std::io::{BufWriter, Write};
-use std::{env, error::Error, fs, path::PathBuf, process::Command};
+use std::{error::Error, fs, path::PathBuf, process::Command};
 use url::Url;
 
 /// Bundler is any object that can produce an executable bundle.
@@ -22,7 +22,7 @@ pub struct Darwin<'a> {
     /// Filepath to icon.
     pub icon: Option<infer::Icon>,
     /// Blob of binary for the executable.
-    pub executable: &'a [u8]
+    pub executable: &'a [u8],
 }
 
 impl Bundler for Darwin<'_> {
@@ -45,11 +45,15 @@ impl Bundler for Darwin<'_> {
             &self.executable,
         )?;
         fs::File::create(&plist)?.write_all(
-            format!(include_str!("../res/Info.plist"), executable = &executable,).as_bytes(),
+            format!(
+                include_str!("../../res/Info.plist"),
+                executable = &executable,
+            )
+            .as_bytes(),
         )?;
         fs::File::create(&wrapper)?.write_all(
             format!(
-                include_str!("../res/launch.sh"),
+                include_str!("../../res/launch.sh"),
                 executable = &executable,
                 title = &self.name,
                 url = &self.url.as_str(),
@@ -95,14 +99,14 @@ impl Bundler for Windows<'_> {
         fs::write(&exec, &self.executable)?;
         fs::File::create(&launcher)?.write_all(
             format!(
-                include_str!("../res/launch.bat"),
+                include_str!("../../res/launch.bat"),
                 name = &self.name,
                 executable = format!("{}.exe", &self.name),
                 url = &self.url,
             )
             .as_bytes(),
         )?;
-        fs::File::create(&packer)?.write_all(include_bytes!("../res/warp-packer.exe"))?;
+        fs::File::create(&packer)?.write_all(include_bytes!("../../res/warp-packer.exe"))?;
         Command::new(&packer.to_string_lossy().as_ref())
             .arg("--arch")
             .arg("windows-x64")
@@ -115,7 +119,7 @@ impl Bundler for Windows<'_> {
             .output()?;
         if let Some(icon) = self.icon {
             resize(&icon.img, 255, 255, Lanczos3).save(&icon_path)?;
-            fs::File::create(&rcedit)?.write_all(include_bytes!("../res/rcedit.exe"))?;
+            fs::File::create(&rcedit)?.write_all(include_bytes!("../../res/rcedit.exe"))?;
             Command::new(&rcedit.to_string_lossy().as_ref())
                 .arg("-open")
                 .arg(&bundle.to_string_lossy().as_ref())
