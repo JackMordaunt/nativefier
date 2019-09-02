@@ -1,0 +1,13 @@
+[package]
+name = "webview"
+version = "0.1.0"
+authors = ["Jack Mordaunt <jackmordaunt@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+web-view = "0.4.1"
+clap = "2.33.0"
+
+[target.'cfg(windows)'.dependencies]
+# Required for DPI scaling on windows. Sigh.
+winapi = { version = "0.3.8", features = ["shellscalingapi"] }
