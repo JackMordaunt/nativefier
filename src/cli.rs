@@ -78,7 +78,7 @@ fn main() {
                 Some(icon_url) => icon_url.parse().expect("malformed URL"),
                 None => url.clone(),
             };
-            let icon = infer_icon(&icon_url).expect("inferring icon");
+            let icon = Some(infer_icon(&icon_url).expect("inferring icon"));
             if cfg!(windows) {
                 bundle::Windows {
                     dir: &dir,

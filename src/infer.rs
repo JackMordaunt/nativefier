@@ -15,6 +15,9 @@ use url::Url;
 pub type Result<T> = StdResult<T, Error>;
 
 /// Infer an icon using the default Inferer.
+///
+// Todo: return `Result<Option<Icon>>>` to disambiguate between
+// whether an error occured or an icon was not found
 pub fn infer_icon(url: &Url) -> Result<Icon> {
     Inferer::default().infer(&url.clone().into_string())
 }

@@ -20,7 +20,7 @@ pub struct Darwin<'a> {
     /// Url to wrap.
     pub url: &'a Url,
     /// Filepath to icon.
-    pub icon: infer::Icon,
+    pub icon: Option<infer::Icon>,
 }
 
 impl Bundler for Darwin<'_> {
@@ -55,7 +55,9 @@ impl Bundler for Darwin<'_> {
             .as_bytes(),
         )?;
         Command::new("chmod").arg("+x").arg(&wrapper).output()?;
-        icns::Encoder::new(BufWriter::new(fs::File::create(&icon_path)?)).encode(&self.icon.img)?;
+        if let Some(icon) = self.icon {
+            icns::Encoder::new(BufWriter::new(fs::File::create(&icon_path)?)).encode(&icon.img)?;
+        }
         Ok(())
     }
 }
@@ -65,7 +67,7 @@ pub struct Windows<'a> {
     pub dir: &'a str,
     pub name: &'a str,
     pub url: &'a Url,
-    pub icon: infer::Icon,
+    pub icon: Option<infer::Icon>,
 }
 
 /// Bundler uses an executable "warp-packer" to create a standalone binary,
@@ -84,7 +86,7 @@ impl Bundler for Windows<'_> {
         let input = workspace.join(&self.name);
         let exec = input.join(format!("{}.exe", &self.name));
         let launcher = input.join("launch.bat");
-        let icon = workspace.join("icon.ico");
+        let icon_path = workspace.join("icon.ico");
         let rcedit = workspace.join("rcedit.exe");
         fs::create_dir_all(&input)?;
         fs::copy(env::current_exe()?.to_path_buf(), &exec)?;
@@ -108,20 +110,22 @@ impl Bundler for Windows<'_> {
             .arg("--output")
             .arg(bundle.to_string_lossy().as_ref())
             .output()?;
-        resize(&self.icon.img, 255, 255, Lanczos3).save(&icon)?;
-        fs::File::create(&rcedit)?.write_all(include_bytes!("../res/rcedit.exe"))?;
-        Command::new(&rcedit.to_string_lossy().as_ref())
-            .arg("-open")
-            .arg(&bundle.to_string_lossy().as_ref())
-            .arg("-save")
-            .arg(&bundle.to_string_lossy().as_ref())
-            .arg("-action")
-            .arg("addoverwrite")
-            .arg("-res")
-            .arg(&icon.to_string_lossy().as_ref())
-            .arg("-mask")
-            .arg("ICONGROUP,1,1033")
-            .output()?;
+        if let Some(icon) = self.icon {
+            resize(&icon.img, 255, 255, Lanczos3).save(&icon_path)?;
+            fs::File::create(&rcedit)?.write_all(include_bytes!("../res/rcedit.exe"))?;
+            Command::new(&rcedit.to_string_lossy().as_ref())
+                .arg("-open")
+                .arg(&bundle.to_string_lossy().as_ref())
+                .arg("-save")
+                .arg(&bundle.to_string_lossy().as_ref())
+                .arg("-action")
+                .arg("addoverwrite")
+                .arg("-res")
+                .arg(&icon_path.to_string_lossy().as_ref())
+                .arg("-mask")
+                .arg("ICONGROUP,1,1033")
+                .output()?;
+        }
         // Cleanup.
         fs::rename(&bundle, root.join(format!("{}.exe", &self.name)))?;
         fs::remove_dir_all(&workspace).map(|err| format!("removing temporary files: {:?}", err))?;

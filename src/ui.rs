@@ -45,7 +45,7 @@ fn parse_url(url: &str) -> Result<Url, Box<dyn Error>> {
 }
 
 fn build(name: String, url: &Url, directory: String) -> Result<(), Box<dyn ::std::error::Error>> {
-    let icon = infer_icon(&url).map_err(|err| format!("inferring icon: {}", err))?;
+    let icon = Some(infer_icon(&url).map_err(|err| format!("inferring icon: {}", err))?);
     if cfg!(windows) {
         bundle::Windows {
             dir: &directory,
