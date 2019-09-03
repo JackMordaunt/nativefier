@@ -1,6 +1,6 @@
 use dirs;
 use log::{error, trace};
-use nativefier::{infer_icon, Bundler, Darwin, Windows};
+use nativefier::{infer_icon, bundle};
 use pretty_env_logger;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -40,28 +40,8 @@ fn parse_url(url: &str) -> Result<Url, Box<dyn Error>> {
 }
 
 fn build(name: String, url: &Url, directory: String) -> Result<(), Box<dyn ::std::error::Error>> {
-    let icon = Some(infer_icon(&url).map_err(|err| format!("inferring icon: {}", err))?);
-    if cfg!(windows) {
-        Windows {
-            dir: &directory,
-            name: &name,
-            url: &url,
-            icon: icon,
-            executable: &[0],
-        }
-        .bundle()
-        .map_err(|err| format!("bundling Windows app: {}", err).into())
-    } else {
-        Darwin {
-            dir: &directory,
-            name: &name,
-            url: &url,
-            icon: icon,
-            executable: &[0],
-        }
-        .bundle()
-        .map_err(|err| format!("bundling MacOS app: {}", err).into())
-    }
+    let icon = infer_icon(&url).map_err(|err| format!("inferring icon: {}", err))?;
+    bundle(&directory, &name, url, Some(&icon))
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
