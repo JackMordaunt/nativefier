@@ -22,14 +22,20 @@ pub fn bundle(
 }
 
 /// bundle for the current host OS.
-#[cfg(target_os = "unix")]
+#[cfg(target_os = "macos")]
 pub fn bundle(
     dir: &str,
     name: &str,
     url: &Url,
     icon: Option<&infer::Icon>,
 ) -> Result<(), Box<dyn Error>> {
-    Ok(())
+    Darwin {
+        dir,
+        name,
+        url,
+        icon,
+    }
+    .bundle()
 }
 
 /// Bundler is any object that can produce an executable bundle.
@@ -39,60 +45,59 @@ pub trait Bundler {
     fn bundle(self) -> Result<(), Box<dyn Error>>;
 }
 
-// // Darwin bundles a macos app bundle.
-// pub struct Darwin<'a> {
-//     /// Output directory. Defaults to current working directory.
-//     pub dir: &'a str,
-//     /// Name of the application.
-//     pub name: &'a str,
-//     /// Url to wrap.
-//     pub url: &'a Url,
-//     // Icon data.
-//     pub icon: Option<&'a infer::Icon>,
-// }
+// Darwin bundles a macos app bundle.
+pub struct Darwin<'a> {
+    /// Output directory. Defaults to current working directory.
+    pub dir: &'a str,
+    /// Name of the application.
+    pub name: &'a str,
+    /// Url to wrap.
+    pub url: &'a Url,
+    // Icon data.
+    pub icon: Option<&'a infer::Icon>,
+}
 
-// impl Bundler for Darwin<'_> {
-//     fn bundle(self) -> Result<(), Box<dyn Error>> {
-//         let executable = self
-//             .name
-//             .chars()
-//             .filter(|c| !c.is_whitespace())
-//             .map(|c| c.to_ascii_lowercase())
-//             .collect::<String>();
-//         let app = PathBuf::from(&self.dir).join(format!("{0}.app", &self.name));
-//         let plist = app.join("Contents/Info.plist");
-//         let wrapper = app.join(format!("Contents/MacOS/{0}.sh", &executable));
-//         let icon_path = app.join("Contents/Resources/icon.icns");
-//         for dir in ["Contents/MacOS", "Contents/Resources"].iter() {
-//             fs::create_dir_all(app.join(dir))?;
-//         }
-//         fs::write(
-//             app.join(format!("Contents/MacOS/{0}", &executable)),
-//             include_bytes!("../../target/release/webview.exe"),
-//         )?;
-//         fs::File::create(&plist)?.write_all(
-//             format!(
-//                 include_str!("../../res/Info.plist"),
-//                 executable = &executable,
-//             )
-//             .as_bytes(),
-//         )?;
-//         fs::File::create(&wrapper)?.write_all(
-//             format!(
-//                 include_str!("../../res/launch.sh"),
-//                 executable = &executable,
-//                 title = &self.name,
-//                 url = &self.url.as_str(),
-//             )
-//             .as_bytes(),
-//         )?;
-//         Command::new("chmod").arg("+x").arg(&wrapper).output()?;
-//         if let Some(icon) = self.icon {
-//             icns::Encoder::new(BufWriter::new(fs::File::create(&icon_path)?)).encode(&icon.img)?;
-//         }
-//         Ok(())
-//     }
-// }
+#[cfg(target_os = "macos")]
+impl Bundler for Darwin<'_> {
+    fn bundle(self) -> Result<(), Box<dyn Error>> {
+        let executable = self
+            .name
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .map(|c| c.to_ascii_lowercase())
+            .collect::<String>();
+        let app = PathBuf::from(&self.dir).join(format!("{0}.app", &self.name));
+        let plist = app.join("Contents/Info.plist");
+        let wrapper = app.join(format!("Contents/MacOS/{0}.sh", &executable));
+        let icon_path = app.join("Contents/Resources/icon.icns");
+        for dir in ["Contents/MacOS", "Contents/Resources"].iter() {
+            fs::create_dir_all(app.join(dir))?;
+        }
+        fs::File::create(app.join(format!("Contents/MacOS/{0}", &executable)))?
+            .write_all(include_bytes!("../../target/release/webview"))?;
+        fs::File::create(&plist)?.write_all(
+            format!(
+                include_str!("../../res/Info.plist"),
+                executable = &executable,
+            )
+            .as_bytes(),
+        )?;
+        fs::File::create(&wrapper)?.write_all(
+            format!(
+                include_str!("../../res/launch.sh"),
+                executable = &executable,
+                title = &self.name,
+                url = &self.url.as_str(),
+            )
+            .as_bytes(),
+        )?;
+        Command::new("chmod").arg("+x").arg(&wrapper).output()?;
+        if let Some(icon) = self.icon {
+            icns::Encoder::new(BufWriter::new(fs::File::create(&icon_path)?)).encode(&icon.img)?;
+        }
+        Ok(())
+    }
+}
 
 // Windows bundles a windows executable.
 pub struct Windows<'a> {
@@ -107,8 +112,8 @@ pub struct Windows<'a> {
 /// Yeah, it's pretty hacky and bloaty. Still smaller than electron ;)
 ///  
 /// Todo: remove dependency on warp-packer and ResourceHacker.
+#[cfg(target_os = "windows")]
 impl Bundler for Windows<'_> {
-    #[cfg(target_os = "windows")]
     fn bundle(self) -> Result<(), Box<dyn Error>> {
         use image::imageops::{resize, Lanczos3};
         let root = PathBuf::from(&self.dir);
@@ -121,7 +126,7 @@ impl Bundler for Windows<'_> {
         let icon_path = workspace.join("icon.ico");
         let rcedit = workspace.join("rcedit.exe");
         fs::create_dir_all(&input)?;
-        // Fixme: Should this be a resource? 
+        // Fixme: Should this be a resource?
         fs::File::create(&exec)?.write_all(include_bytes!("../../target/release/webview.exe"))?;
         fs::File::create(&launcher)?.write_all(
             format!(
