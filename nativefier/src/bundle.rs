@@ -1,6 +1,5 @@
 use crate::infer;
-use icns;
-use std::io::{BufWriter, Write};
+use std::io::Write;
 use std::{error::Error, fs, path::PathBuf, process::Command};
 use url::Url;
 
@@ -60,6 +59,8 @@ pub struct Darwin<'a> {
 #[cfg(target_os = "macos")]
 impl Bundler for Darwin<'_> {
     fn bundle(self) -> Result<(), Box<dyn Error>> {
+        use icns;
+        use std::io::BufWriter;
         let executable = self
             .name
             .chars()
