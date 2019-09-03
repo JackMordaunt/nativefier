@@ -1,6 +1,6 @@
 use dirs;
 use log::{error, trace};
-use nativefier::{infer_icon, bundle};
+use nativefier::{bundle, infer_icon};
 use pretty_env_logger;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -39,7 +39,7 @@ fn parse_url(url: &str) -> Result<Url, Box<dyn Error>> {
     }
 }
 
-fn build(name: String, url: &Url, directory: String) -> Result<(), Box<dyn ::std::error::Error>> {
+fn build(name: String, url: &Url, directory: String) -> Result<(), Box<dyn Error>> {
     let icon = infer_icon(&url).map_err(|err| format!("inferring icon: {}", err))?;
     bundle(&directory, &name, url, Some(&icon))
 }
