@@ -5,10 +5,8 @@ authors = ["Jack Mordaunt <jackmordaunt@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-web-view = "0.4.1"
 clap = "2.33.0"
 url = "2.1.0"
-hyper = "0.12.33"
 log = "0.4.8"
 pretty_env_logger = "0.3.1"
 
