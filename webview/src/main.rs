@@ -1,4 +1,5 @@
 //! WebView responsible for rendering the provided url in a webview.
+#![windows_subsystem = "windows"]
 use clap::{App, Arg};
 use web_view;
 
